@@ -3,6 +3,7 @@ import copy
 import logging
 import numpy as np
 import time
+import os
 import torch
 
 # metrics
@@ -47,6 +48,7 @@ if __name__ == '__main__':
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate argument")
     parser.add_argument("--experiment", type=str, help="names of experiment to run")
     parser.add_argument("--output", type=str, help="output file")
+    parser.add_argument("--max", type=float, default=0.81, help="maximum accuracy")
     args = parser.parse_args()
 
     logging.info(f"Device = {args.device}")
@@ -104,8 +106,10 @@ if __name__ == '__main__':
         shardsize = args.shardsize
 
     logging.info(f"Experiment: {args.experiment}")
-    if args.experiment == "test":
-        mergers = [("FedAvg", Merger_FedAvg())]*100
+    if args.experiment == "extra1":
+        mergers = [("FedAvg", Merger_FedAvg()),
+                   ("FedSoftMax", Merger_FedSoft(+5.0)),
+                   ("FedSoftMin", Merger_FedSoft(-5.0))]*500
     elif args.experiment == "exp1":
         mergers = [("FedAvg", Merger_FedAvg()),
                    ("FedSoftmax", Merger_FedSoft(+5.0)),
@@ -215,9 +219,14 @@ if __name__ == '__main__':
             accuracies.append(get_accuracy(model, testloader))
             avglosses.append(sum(output.losses[-1] * output.size for output in outputs)/len(data_train))
 
-        with open(f'./outputs/{output_file}_accs.inf', 'a') as file:
+            if accuracies[-1] >= args.max: break
+
+        if not os.path.exists("./outputs/"):
+            os.mkdir("./outputs/")
+
+        with open(f"./outputs/{output_file}_accs.inf", 'a') as file:
             file.write(f"[{merger_name}] {', '.join(map(str, accuracies))}\n")
-        with open(f'./outputs/{output_file}_loss.inf', 'a') as file:
+        with open(f"./outputs/{output_file}_loss.inf", 'a') as file:
             file.write(f"[{merger_name}] {', '.join(map(str, avglosses))}\n")
 
 
