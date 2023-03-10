@@ -5,6 +5,8 @@ import numpy as np
 import time
 import os
 import torch
+import matplotlib.pyplot as plt
+from torch.optim.lr_scheduler import StepLR
 
 # metrics
 from src.accuracy import get_accuracy
@@ -112,8 +114,8 @@ if __name__ == '__main__':
                    ("FedSoftMin", Merger_FedSoft(-5.0))]*500
     elif args.experiment == "exp1":
         mergers = [("FedAvg", Merger_FedAvg()),
-                   ("FedSoftmax", Merger_FedSoft(+5.0)),
-                   ("FedSoftmin", Merger_FedSoft(-5.0))]*100
+                   ("FedSoftMax", Merger_FedSoft(+5.0)),
+                   ("FedSoftMin", Merger_FedSoft(-5.0))]*1
     elif args.experiment == "exp2":
         mergers = [("FedAvg", Merger_FedAvg()),
                    ("FedAvgSmax", Merger_Hybrid([Merger_FedAvg(), Merger_FedSoft(+5.0)],
@@ -187,6 +189,26 @@ if __name__ == '__main__':
             accuracies[f'local_{client_id}-local_{client_id}'] = []
             accuracies[f'local_{client_id}-global'] = []
             accuracies[f'global-local_{client_id}'] = []
+            accuracies[f'locally_local_{client_id}'] = []
+
+        for client_id in range(nb_clients):
+            model.load_state_dict(W)
+            model.train()
+            optim = torch.optim.SGD(model.parameters(), lr=args.lr)
+            scheduler = StepLR(optim, step_size=epochs, gamma=0.99)
+
+            mini_dataloader = torch.utils.data.DataLoader(datasets[client_id]['train'], batch_size=batchsize, shuffle=True, num_workers=0)
+            for epoch in range(epochs*rounds):
+                for (x, y) in mini_dataloader:
+                    optim.zero_grad()
+                    y_out = model(x)
+                    loss = loss_fn(y_out, y)
+                    loss.backward()
+                    optim.step()
+                    scheduler.step()
+
+                accuracies[f'locally_local_{client_id}'].append(get_accuracy(model, mini_dataloader))
+
 
         for round in range(rounds):
             t1 = time.perf_counter()
@@ -245,6 +267,27 @@ if __name__ == '__main__':
                 file.write(f"[{merger_name}:{client_id}:{client_id}] {', '.join(map(str, accuracies[f'local_{client_id}-local_{client_id}']))}\n")
                 file.write(f"[{merger_name}:{client_id}:global] {', '.join(map(str, accuracies[f'local_{client_id}-global']))}\n")
                 file.write(f"[{merger_name}:global:{client_id}] {', '.join(map(str, accuracies[f'global-local_{client_id}']))}\n")
+                file.write(f"[locally_local:{client_id}] {', '.join(map(str, accuracies[f'locally_local_{client_id}']))}\n")
             file.write(f"[{merger_name}:pi] {', '.join(map(str, [len(datasets[client_id]['train']) for client_id in range(nb_clients)]))}\n")
+            # compute the ponderated average of the difference between global-local and locally local
+            sum_train_sets = sum([len(datasets[client_id]['train']) for client_id in range(nb_clients)])
+            accs_gain = [np.sum([(accuracies[f'global-local_{client_id}'][i] - accuracies[f'locally_local_{client_id}'][i*epochs])*len(datasets[client_id]['train'])/sum_train_sets for client_id in range(nb_clients)]) for i in range(len(accuracies[f'global-local_{0}']))]
+            file.write(f"[{merger_name}:gain] {', '.join(map(str, accs_gain))}\n")
+        
+        # for client_id in range(1, 3):
+        #     print(f"Final accuracy for client {client_id} only locally: {accuracies[f'locally_local_{client_id}'][-1]}")
+        #     print(f"Final accuracy of global model for client {client_id} on local: {accuracies[f'global-local_{client_id}'][-1]}")
+        print(f"Final mean accuracy of locally local models: {np.sum([len(datasets[client_id]['train'])/sum_train_sets*accuracies[f'locally_local_{client_id}'][-1] for client_id in range(nb_clients)])}")
+        print(f"Final accuracy of global model for global: {accuracies['global-global'][-1]}")
+        print(f"Mean final gain: {accs_gain[-1]}")
+
+        # # plot accs_gain
+        # plt.plot(accs_gain)
+        # plt.title(f"Gain of {merger_name}")
+        # plt.xlabel("Round")
+        # plt.ylabel("Gain")
+        # plt.savefig(f"./outputs/{output_file}_gain.png")
+        # plt.show()
+
 
 
