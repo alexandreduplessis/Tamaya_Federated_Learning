@@ -192,7 +192,7 @@ if __name__ == '__main__':
             outputs = []
             for client_id in range(nb_clients):
                 output = ClientOutput(client_id)
-                output.size = len(datasets[client_id])
+                output.size = len(datasets[client_id]['train'])
                 output.losses = []
                 output.round = round
 
