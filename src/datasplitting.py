@@ -48,6 +48,7 @@ def split_dataset_iid(dataset, nb_clients, ratio_test=0.2):
              'test' : torch.utils.data.Subset(dataset, subset[-int(ratio_test * len(subset)):])}
             for subset in subsets]
 
+
 def split_dataset_noniid(dataset, nb_clients, shard_size=1000, ratio_test=0.2):
     assert(len(dataset) > nb_clients)
     subsets = [[] for n in range(nb_clients)]
@@ -64,6 +65,10 @@ def split_dataset_noniid(dataset, nb_clients, shard_size=1000, ratio_test=0.2):
     if ratio_test == 0:
         return [{'train': torch.utils.data.Subset(dataset, subset),
                  'test' : None} for subset in subsets]
-    return [{'train': torch.utils.data.Subset(dataset, subset[:-int(ratio_test * len(subset))]),
-             'test' : torch.utils.data.Subset(dataset, subset[-int(ratio_test * len(subset)):])}
-            for subset in subsets]
+
+    result = []
+    for subset in subsets:
+        np.random.shuffle(subset)
+        result.append({'train': torch.utils.data.Subset(dataset, subset[:-int(ratio_test * len(subset))]),
+                       'test' : torch.utils.data.Subset(dataset, subset[-int(ratio_test * len(subset)):])})
+    return result
