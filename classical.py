@@ -1,5 +1,7 @@
 
 import torch
+
+from src.convnet import ConvNet
 from src.tf_cifar import TFCifar
 from src.datasets import MNIST, FMNIST, CIFAR10
 from src.accuracy import get_accuracy
@@ -9,9 +11,9 @@ if __name__ == "__main__":
     epochs = 100
     batchsize = 64
 
-    data_train = CIFAR10(True, device)
-    data_test = CIFAR10(False, device)
-    model = TFCifar()
+    data_train = MNIST(True, device)
+    data_test = MNIST(False, device)
+    model = ConvNet()
     model.to(device)
 
     accs = []

@@ -17,7 +17,7 @@ from src.convnet import ConvNet
 from src.datasets import MNIST, FMNIST, CIFAR10
 
 # dataset splitting algorithms
-from src.datasplitting import split_dataset, split_dataset_iid
+from src.datasplitting import split_dataset_iid, split_dataset_noniid
 
 # strategies
 from src.client_output import ClientOutput
@@ -172,13 +172,20 @@ if __name__ == '__main__':
         merger.reset()
 
         reset_parameters(model)
+        W0 = copy.deepcopy(model.state_dict())
+
+        print("Apprentissage fédéré sur chaque client...")
+        model.load_state_dict(W0)
         W = copy.deepcopy(model.state_dict())
 
-        if not(balanced): datasets = split_dataset(data_train, nb_clients, shardsize)
-        else: datasets = split_dataset_iid(data_train, nb_clients)
 
-        accuracies = [get_accuracy(model, testloader)]
-        avglosses = []
+        if not(balanced): datasets = split_dataset_noniid(data_train, nb_clients, shard_size=shardsize, ratio_test=0.15)
+        else: datasets = split_dataset_iid(data_train, nb_clients, ratio_test=0.15)
+
+        accuracies = {'global': [get_accuracy(model, testloader)]}
+        for client_id in range(nb_clients):
+            accuracies[f'local_{client_id}'] = []
+            accuracies[f'global_{client_id}'] = []
 
         for round in range(rounds):
             t1 = time.perf_counter()
@@ -193,7 +200,7 @@ if __name__ == '__main__':
                 model.train()
                 optim = torch.optim.SGD(model.parameters(), lr=learningrates[round])
 
-                dataloader = torch.utils.data.DataLoader(datasets[client_id], batch_size=batchsize, shuffle=True, num_workers=0)
+                dataloader = torch.utils.data.DataLoader(datasets[client_id]['train'], batch_size=batchsize, shuffle=True, num_workers=0)
                 for epoch in range(epochs):
                     output.losses.append(0.0)
                     for (x, y) in dataloader:
@@ -209,6 +216,10 @@ if __name__ == '__main__':
                 output.weight = copy.deepcopy(model.state_dict())
                 outputs.append(output)
 
+                testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1000, shuffle=False, num_workers=0)
+
+                accuracies[f'local_{client_id}'].append(get_accuracy(model, testclient))
+                accuracies[f'global_{client_id}'].append(get_accuracy(model, testloader))
             W = merger(outputs)
             model.load_state_dict(W)
 
@@ -216,17 +227,17 @@ if __name__ == '__main__':
             elapsed_time = time.perf_counter() - t1
             remaining_time = (time.perf_counter() - t0) * (steps-step)/step
             print(f"[{merger_name}:{round+1}/{rounds}]: {elapsed_time:.2f}sec/round, remaining time: {fmttime(int(remaining_time))}")
-            accuracies.append(get_accuracy(model, testloader))
-            avglosses.append(sum(output.losses[-1] * output.size for output in outputs)/len(data_train))
+            accuracies['global'].append(get_accuracy(model, testloader))
 
-            if accuracies[-1] >= args.max: break
+            if accuracies['global'][-1] >= args.max: break
 
         if not os.path.exists("./outputs/"):
             os.mkdir("./outputs/")
 
         with open(f"./outputs/{output_file}_accs.inf", 'a') as file:
-            file.write(f"[{merger_name}] {', '.join(map(str, accuracies))}\n")
-        with open(f"./outputs/{output_file}_loss.inf", 'a') as file:
-            file.write(f"[{merger_name}] {', '.join(map(str, avglosses))}\n")
+            file.write(f"[{merger_name}:global] {', '.join(map(str, accuracies['global']))}\n")
+            for client_id in range(nb_clients):
+                file.write(f"[{merger_name}:local:{client_id}] {', '.join(map(str, accuracies[f'local_{client_id}']))}\n")
+                file.write(f"[{merger_name}:global:{client_id}] {', '.join(map(str, accuracies[f'global_{client_id}']))}\n")
 
 

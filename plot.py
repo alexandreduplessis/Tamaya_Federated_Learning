@@ -12,7 +12,14 @@ if __name__ == '__main__':
     filenames = ["final/exp1_accs.inf", "final/exp2_accs.inf", "final/exp3_accs.inf", "final/exp5_accs.inf", "outputs/exp7iid_accs.inf", "outputs/exp7niid_accs.inf", "outputs/exp10iid_accs.inf"]
     extras = ["exp1_", "exp2_", "exp3_", "exp5_", "exp7iid_", "exp7niid_", "exp10iid_"]
     exp1, exp2, exp3, exp5, exp7iid, exp7niid, exp10iid = filenames
-    files = {filename: read_file(filename, extra)[1] for filename, extra in zip(filenames, extras)}
+    # files = {filename: read_file(filename, extra)[1] for filename, extra in zip(filenames, extras)}
+
+    fixed_colors = {"FedAvg": (0.8,0,0),
+                    "FedSoftMax": (0.5,0,0),
+                    "FedSoftMin": (0.2,0,0)}
+    Rp("test", read_file("outputs/two_init_accs.inf", "test")[1], 70)
+    exit(0)
+
 
     ### rename curves
 
@@ -87,7 +94,7 @@ if __name__ == '__main__':
     Rp("SET8", datas["SET8"], filename="set8.txt")
     last_accuracy("SET8", datas["SET8"])
     doublezoom_plot(datas["SET8"], fixed_colors, option={"y2": 75, "y3": 78}, filename="set8.png")
-    
+
     Rp("SET9", datas["SET9"], filename="set9.txt")
     doublezoom_plot(datas["SET9"], fixed_colors, option={"y2": 75, "y3": 78}, filename="set9.png")
 
