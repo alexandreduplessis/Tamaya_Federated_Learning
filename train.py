@@ -42,7 +42,7 @@ if __name__ == '__main__':
     parser.add_argument("--batch", type=int, default=64, help="batch size")
     parser.add_argument("--rounds", type=int, default=100, help="nb of rounds")
     parser.add_argument("--epochs", type=int, default=1, help="nb of local epochs")
-    parser.add_argument("--balanced", type=bool, default=False, help="True for balanced clients")
+    parser.add_argument("--balanced", type=str, default='iid', help="iid for balanced clients")
     parser.add_argument("--shardsize", type=int, default=30, help="shardsize argument for unbalanced datasets")
     parser.add_argument("--lrmethod", type=str, default="decay", choices=["const", "decay"], help="learning rate method")
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate argument")
@@ -98,7 +98,7 @@ if __name__ == '__main__':
         learningrates = [args.lr * (0.99**r) for r in range(rounds)]
         logging.info(f"Learning rate: {args.lr} * (0.99**r)")
 
-    balanced = args.balanced
+    balanced = (args.balanced == 'iid')
     if balanced:
         logging.info(f"Datasplitting: IID")
     if not(balanced):
@@ -182,10 +182,11 @@ if __name__ == '__main__':
         if not(balanced): datasets = split_dataset_noniid(data_train, nb_clients, shard_size=shardsize, ratio_test=0.15)
         else: datasets = split_dataset_iid(data_train, nb_clients, ratio_test=0.15)
 
-        accuracies = {'global': [get_accuracy(model, testloader)]}
+        accuracies = {'global-global': [get_accuracy(model, testloader)]}
         for client_id in range(nb_clients):
-            accuracies[f'local_{client_id}'] = []
-            accuracies[f'global_{client_id}'] = []
+            accuracies[f'local_{client_id}-local_{client_id}'] = []
+            accuracies[f'local_{client_id}-global'] = []
+            accuracies[f'global-local_{client_id}'] = []
 
         for round in range(rounds):
             t1 = time.perf_counter()
@@ -218,8 +219,8 @@ if __name__ == '__main__':
 
                 testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1000, shuffle=False, num_workers=0)
 
-                accuracies[f'local_{client_id}'].append(get_accuracy(model, testclient))
-                accuracies[f'global_{client_id}'].append(get_accuracy(model, testloader))
+                accuracies[f'local_{client_id}-local_{client_id}'].append(get_accuracy(model, testclient))
+                accuracies[f'local_{client_id}-global'].append(get_accuracy(model, testloader))
             W = merger(outputs)
             model.load_state_dict(W)
 
@@ -227,17 +228,23 @@ if __name__ == '__main__':
             elapsed_time = time.perf_counter() - t1
             remaining_time = (time.perf_counter() - t0) * (steps-step)/step
             print(f"[{merger_name}:{round+1}/{rounds}]: {elapsed_time:.2f}sec/round, remaining time: {fmttime(int(remaining_time))}")
-            accuracies['global'].append(get_accuracy(model, testloader))
+            accuracies['global-global'].append(get_accuracy(model, testloader))
+            for client_id in range(nb_clients):
+                testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1000, shuffle=False, num_workers=0)
+                accuracies[f'global-local_{client_id}'].append(get_accuracy(model, testclient))
 
-            if accuracies['global'][-1] >= args.max: break
+
+            if accuracies['global-global'][-1] >= args.max: break
 
         if not os.path.exists("./outputs/"):
             os.mkdir("./outputs/")
 
         with open(f"./outputs/{output_file}_accs.inf", 'a') as file:
-            file.write(f"[{merger_name}:global] {', '.join(map(str, accuracies['global']))}\n")
+            file.write(f"[{merger_name}:global:global] {', '.join(map(str, accuracies['global-global']))}\n")
             for client_id in range(nb_clients):
-                file.write(f"[{merger_name}:local:{client_id}] {', '.join(map(str, accuracies[f'local_{client_id}']))}\n")
-                file.write(f"[{merger_name}:global:{client_id}] {', '.join(map(str, accuracies[f'global_{client_id}']))}\n")
+                file.write(f"[{merger_name}:{client_id}:{client_id}] {', '.join(map(str, accuracies[f'local_{client_id}-local_{client_id}']))}\n")
+                file.write(f"[{merger_name}:{client_id}:global] {', '.join(map(str, accuracies[f'local_{client_id}-global']))}\n")
+                file.write(f"[{merger_name}:global:{client_id}] {', '.join(map(str, accuracies[f'global-local_{client_id}']))}\n")
+            file.write(f"[{merger_name}:pi] {', '.join(map(str, [len(datasets[client_id]['train']) for client_id in range(nb_clients)]))}\n")
 
 
