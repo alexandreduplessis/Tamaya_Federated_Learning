@@ -162,7 +162,7 @@ if __name__ == '__main__':
     if output_file is None: logging.warning("Output file not defined!")
 
     loss_fn = torch.nn.CrossEntropyLoss(reduction='sum')
-    testloader = torch.utils.data.DataLoader(data_test, batch_size=1000, shuffle=False, num_workers=0)
+    testloader = torch.utils.data.DataLoader(data_test, batch_size=4, shuffle=False, num_workers=0)
 
     steps = len(mergers) * rounds
     step = 0
@@ -217,7 +217,7 @@ if __name__ == '__main__':
                 output.weight = copy.deepcopy(model.state_dict())
                 outputs.append(output)
 
-                testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1000, shuffle=False, num_workers=0)
+                testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=4, shuffle=False, num_workers=0)
 
                 accuracies[f'local_{client_id}-local_{client_id}'].append(get_accuracy(model, testclient))
                 accuracies[f'local_{client_id}-global'].append(get_accuracy(model, testloader))
@@ -230,14 +230,19 @@ if __name__ == '__main__':
             print(f"[{merger_name}:{round+1}/{rounds}]: {elapsed_time:.2f}sec/round, remaining time: {fmttime(int(remaining_time))}")
             accuracies['global-global'].append(get_accuracy(model, testloader))
             for client_id in range(nb_clients):
-                testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1000, shuffle=False, num_workers=0)
+                testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=4, shuffle=False, num_workers=0)
                 accuracies[f'global-local_{client_id}'].append(get_accuracy(model, testclient))
-
 
             if accuracies['global-global'][-1] >= args.max: break
 
         if not os.path.exists("./outputs/"):
             os.mkdir("./outputs/")
+
+        sum_train_sets = sum([len(datasets[client_id]['train']) for client_id in range(nb_clients)])
+        print(f"Final accuracy of global model for local: {np.sum([len(datasets[client_id]['train'])/sum_train_sets*accuracies[f'global-local_{client_id}'][-1] for client_id in range(nb_clients)])}")
+        print(f"Final accuracy of global model for global: {accuracies['global-global'][-1]}")
+
+
 
         with open(f"./outputs/{output_file}_accs.inf", 'a') as file:
             file.write(f"[{merger_name}:global:global] {', '.join(map(str, accuracies['global-global']))}\n")

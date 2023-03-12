@@ -17,4 +17,5 @@ class ConvNet(nn.Module):
         x = F.relu(self.conv_2(x))
         x = F.max_pool2d(x, 2)
         x = x.view(x.shape[0], -1)
-        return F.softmax(self.lin(x), dim=0)
+        x = self.lin(x)
+        return x
