@@ -113,7 +113,7 @@ if __name__ == '__main__':
     elif args.experiment == "exp1":
         mergers = [("FedAvg", Merger_FedAvg()),
                    ("FedSoftmax", Merger_FedSoft(+5.0)),
-                   ("FedSoftmin", Merger_FedSoft(-5.0))]*100
+                   ("FedSoftmin", Merger_FedSoft(-5.0))]*10
     elif args.experiment == "exp2":
         mergers = [("FedAvg", Merger_FedAvg()),
                    ("FedAvgSmax", Merger_Hybrid([Merger_FedAvg(), Merger_FedSoft(+5.0)],
@@ -169,6 +169,7 @@ if __name__ == '__main__':
     step = 0
     t0 = time.perf_counter()
     counter_merge = 0
+    accuracies = {}
     for merger_name, merger in mergers:
         print(f"[{merger_name}] Begin...")
         merger.reset()
@@ -180,11 +181,11 @@ if __name__ == '__main__':
         model.load_state_dict(W0)
         W = copy.deepcopy(model.state_dict())
 
+        if counter_merge % 3 == 0:
+            if not(balanced): datasets = split_dataset_noniid(data_train, nb_clients, shard_size=shardsize, ratio_test=0.15)
+            else: datasets = split_dataset_iid(data_train, nb_clients, ratio_test=0.15)
 
-        if not(balanced): datasets = split_dataset_noniid(data_train, nb_clients, shard_size=shardsize, ratio_test=0.15)
-        else: datasets = split_dataset_iid(data_train, nb_clients, ratio_test=0.15)
-
-        accuracies = {'global-global': [get_accuracy(model, testloader)]}
+        accuracies['global-global'] = []
         for client_id in range(nb_clients):
             accuracies[f'local_{client_id}-local_{client_id}'] = []
             accuracies[f'local_{client_id}-global'] = []
@@ -208,8 +209,9 @@ if __name__ == '__main__':
                         loss.backward()
                         optim.step()
                         scheduler.step()
-                    accuracies[f'locally_local_{client_id}'].append(get_accuracy(model, mini_dataloader_test))
-
+                    if epoch % epochs == epochs-1:
+                        accuracies[f'locally_local_{client_id}'].append(get_accuracy(model, mini_dataloader_test))
+        counter_merge += 1
         for round in range(rounds):
             t1 = time.perf_counter()
             outputs = []
@@ -261,12 +263,11 @@ if __name__ == '__main__':
 
         if not os.path.exists("./outputs/"):
             os.mkdir("./outputs/")
-        
         sum_train_sets = sum([len(datasets[client_id]['train']) for client_id in range(nb_clients)])
         print(f"Final accuracy of global model for local: {np.sum([len(datasets[client_id]['train'])/sum_train_sets*accuracies[f'global-local_{client_id}'][-1] for client_id in range(nb_clients)])}")
         print(f"Final accuracy of global model for global: {accuracies['global-global'][-1]}")
-        accs_gain = [np.sum([(accuracies[f'global-local_{client_id}'][i] - accuracies[f'locally_local_{client_id}'][i*epochs])*len(datasets[client_id]['train'])/sum_train_sets for client_id in range(nb_clients)]) for i in range(len(accuracies[f'global-local_{0}']))]
-        ponderated_local = [np.sum([(accuracies[f'locally_local_{client_id}'][i*epochs])*len(datasets[client_id]['train'])/sum_train_sets for client_id in range(nb_clients)]) for i in range(len(accuracies[f'global-local_{0}']))]
+        accs_gain = [np.sum([(accuracies[f'global-local_{client_id}'][i] - accuracies[f'locally_local_{client_id}'][i])*len(datasets[client_id]['train'])/sum_train_sets for client_id in range(nb_clients)]) for i in range(len(accuracies[f'global-local_{0}']))]
+        ponderated_local = [np.sum([(accuracies[f'locally_local_{client_id}'][i])*len(datasets[client_id]['train'])/sum_train_sets for client_id in range(nb_clients)]) for i in range(len(accuracies[f'global-local_{0}']))]
         print(f"Locally local: {ponderated_local[-1]}")
         print(f"Gain: {accs_gain[-1]}")
 
