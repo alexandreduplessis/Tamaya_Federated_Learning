@@ -5,6 +5,8 @@ import numpy as np
 import time
 import os
 import torch
+# import StepLR
+from torch.optim.lr_scheduler import StepLR
 
 # metrics
 from src.accuracy import get_accuracy
@@ -107,9 +109,7 @@ if __name__ == '__main__':
 
     logging.info(f"Experiment: {args.experiment}")
     if args.experiment == "extra1":
-        mergers = [("FedAvg", Merger_FedAvg()),
-                   ("FedSoftMax", Merger_FedSoft(+5.0)),
-                   ("FedSoftMin", Merger_FedSoft(-5.0))]*500
+        mergers = [("FedAvg", Merger_FedAvg())]*1
     elif args.experiment == "exp1":
         mergers = [("FedAvg", Merger_FedAvg()),
                    ("FedSoftmax", Merger_FedSoft(+5.0)),
@@ -161,17 +161,19 @@ if __name__ == '__main__':
     output_file = args.output
     if output_file is None: logging.warning("Output file not defined!")
 
-    loss_fn = torch.nn.CrossEntropyLoss(reduction='sum')
+    loss_fn = torch.nn.CrossEntropyLoss(reduction='mean')
+
     testloader = torch.utils.data.DataLoader(data_test, batch_size=1000, shuffle=False, num_workers=0)
 
     steps = len(mergers) * rounds
     step = 0
     t0 = time.perf_counter()
+    counter_merge = 0
     for merger_name, merger in mergers:
         print(f"[{merger_name}] Begin...")
         merger.reset()
-
-        reset_parameters(model)
+        if counter_merge % 3 == 0:
+            reset_parameters(model)
         W0 = copy.deepcopy(model.state_dict())
 
         print("Apprentissage fédéré sur chaque client...")
@@ -187,6 +189,26 @@ if __name__ == '__main__':
             accuracies[f'local_{client_id}-local_{client_id}'] = []
             accuracies[f'local_{client_id}-global'] = []
             accuracies[f'global-local_{client_id}'] = []
+            if counter_merge % 3 == 0:
+                accuracies[f'locally_local_{client_id}'] = []
+
+        if counter_merge % 3 == 0:
+            for client_id in range(nb_clients):
+                model.load_state_dict(W)
+                model.train()
+                optim = torch.optim.SGD(model.parameters(), lr=args.lr)
+                scheduler = StepLR(optim, step_size=epochs, gamma=0.99)
+                mini_dataloader = torch.utils.data.DataLoader(datasets[client_id]['train'], batch_size=batchsize, shuffle=True, num_workers=0)
+                mini_dataloader_test = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1, shuffle=False, num_workers=0)
+                for epoch in range(epochs*rounds):
+                    for (x, y) in mini_dataloader:
+                        optim.zero_grad()
+                        y_out = model(x)
+                        loss = loss_fn(y_out, y)
+                        loss.backward()
+                        optim.step()
+                        scheduler.step()
+                    accuracies[f'locally_local_{client_id}'].append(get_accuracy(model, mini_dataloader_test))
 
         for round in range(rounds):
             t1 = time.perf_counter()
@@ -229,6 +251,7 @@ if __name__ == '__main__':
             remaining_time = (time.perf_counter() - t0) * (steps-step)/step
             print(f"[{merger_name}:{round+1}/{rounds}]: {elapsed_time:.2f}sec/round, remaining time: {fmttime(int(remaining_time))}")
             accuracies['global-global'].append(get_accuracy(model, testloader))
+            print(f"Global accuracy: {accuracies['global-global'][-1]}")
             for client_id in range(nb_clients):
                 testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1000, shuffle=False, num_workers=0)
                 accuracies[f'global-local_{client_id}'].append(get_accuracy(model, testclient))
@@ -238,13 +261,22 @@ if __name__ == '__main__':
 
         if not os.path.exists("./outputs/"):
             os.mkdir("./outputs/")
+        
+        sum_train_sets = sum([len(datasets[client_id]['train']) for client_id in range(nb_clients)])
+        print(f"Final accuracy of global model for local: {np.sum([len(datasets[client_id]['train'])/sum_train_sets*accuracies[f'global-local_{client_id}'][-1] for client_id in range(nb_clients)])}")
+        print(f"Final accuracy of global model for global: {accuracies['global-global'][-1]}")
+        accs_gain = [np.sum([(accuracies[f'global-local_{client_id}'][i] - accuracies[f'locally_local_{client_id}'][i*epochs])*len(datasets[client_id]['train'])/sum_train_sets for client_id in range(nb_clients)]) for i in range(len(accuracies[f'global-local_{0}']))]
+        ponderated_local = [np.sum([(accuracies[f'locally_local_{client_id}'][i*epochs])*len(datasets[client_id]['train'])/sum_train_sets for client_id in range(nb_clients)]) for i in range(len(accuracies[f'global-local_{0}']))]
+        print(f"Locally local: {ponderated_local[-1]}")
+        print(f"Gain: {accs_gain[-1]}")
+
 
         with open(f"./outputs/{output_file}_accs.inf", 'a') as file:
             file.write(f"[{merger_name}:global:global] {', '.join(map(str, accuracies['global-global']))}\n")
             for client_id in range(nb_clients):
-                file.write(f"[{merger_name}:{client_id}:{client_id}] {', '.join(map(str, accuracies[f'local_{client_id}-local_{client_id}']))}\n")
-                file.write(f"[{merger_name}:{client_id}:global] {', '.join(map(str, accuracies[f'local_{client_id}-global']))}\n")
+                file.write(f"locally_local_{client_id} {', '.join(map(str, accuracies[f'locally_local_{client_id}']))}\n")
+                # file.write(f"[{merger_name}:{client_id}:{client_id}] {', '.join(map(str, accuracies[f'local_{client_id}-local_{client_id}']))}\n")
+                # file.write(f"[{merger_name}:{client_id}:global] {', '.join(map(str, accuracies[f'local_{client_id}-global']))}\n")
                 file.write(f"[{merger_name}:global:{client_id}] {', '.join(map(str, accuracies[f'global-local_{client_id}']))}\n")
             file.write(f"[{merger_name}:pi] {', '.join(map(str, [len(datasets[client_id]['train']) for client_id in range(nb_clients)]))}\n")
-
-
+            file.write(f"[{merger_name}:gain] {', '.join(map(str, accs_gain))}\n")
