@@ -21,7 +21,7 @@ if __name__ == "__main__":
     loss_fn = torch.nn.CrossEntropyLoss(reduction='sum')
     testloader = torch.utils.data.DataLoader(data_test, batch_size=1000, shuffle=True, num_workers=0)
     dataloader = torch.utils.data.DataLoader(data_train, batch_size=batchsize, shuffle=True, num_workers=0)
-    optim = torch.optim.SGD(model.parameters(), lr=5e-4)
+    optim = torch.optim.SGD(model.parameters(), lr=5e-6)
 
     for epoch in range(epochs):
         model.train()

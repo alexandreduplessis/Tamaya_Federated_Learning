@@ -175,7 +175,7 @@ if __name__ == '__main__':
         merger.reset()
         if counter_merge % 3 == 0:
             reset_parameters(model)
-        W0 = copy.deepcopy(model.state_dict())
+            W0 = copy.deepcopy(model.state_dict())
 
         print("Apprentissage fédéré sur chaque client...")
         model.load_state_dict(W0)
