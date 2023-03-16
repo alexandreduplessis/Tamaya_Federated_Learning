@@ -8,6 +8,8 @@ import torch
 # import StepLR
 from torch.optim.lr_scheduler import StepLR
 
+from tqdm import tqdm
+
 # metrics
 from src.accuracy import get_accuracy
 
@@ -112,8 +114,8 @@ if __name__ == '__main__':
         mergers = [("FedAvg", Merger_FedAvg())]*1
     elif args.experiment == "exp1":
         mergers = [("FedAvg", Merger_FedAvg()),
-                   ("FedSoftmax", Merger_FedSoft(+5.0)),
-                   ("FedSoftmin", Merger_FedSoft(-5.0))]*10
+                   ("FedSoftmax", Merger_FedSoft(+20.0)),
+                   ("FedSoftmin", Merger_FedSoft(-20.0))]*10
     elif args.experiment == "exp2":
         mergers = [("FedAvg", Merger_FedAvg()),
                    ("FedAvgSmax", Merger_Hybrid([Merger_FedAvg(), Merger_FedSoft(+5.0)],
@@ -162,7 +164,6 @@ if __name__ == '__main__':
     if output_file is None: logging.warning("Output file not defined!")
 
     loss_fn = torch.nn.CrossEntropyLoss(reduction='mean')
-
     testloader = torch.utils.data.DataLoader(data_test, batch_size=1000, shuffle=False, num_workers=0)
 
     steps = len(mergers) * rounds
@@ -184,6 +185,10 @@ if __name__ == '__main__':
         if counter_merge % 3 == 0:
             if not(balanced): datasets = split_dataset_noniid(data_train, nb_clients, shard_size=shardsize, ratio_test=0.15)
             else: datasets = split_dataset_iid(data_train, nb_clients, ratio_test=0.15)
+        
+        # union_of_testsets = torch.utils.data.ConcatDataset([datasets[client_id]['test'] for client_id in range(nb_clients)])
+        # testloader = torch.utils.data.DataLoader(union_of_testsets, batch_size=1, shuffle=False, num_workers=0)
+        testloader = torch.utils.data.DataLoader(data_test, batch_size=1000, shuffle=False, num_workers=0)
 
         accuracies['global-global'] = []
         for client_id in range(nb_clients):
@@ -194,7 +199,8 @@ if __name__ == '__main__':
                 accuracies[f'locally_local_{client_id}'] = []
 
         if counter_merge % 3 == 0:
-            for client_id in range(nb_clients):
+            print("Apprentissage classique...")
+            for client_id in tqdm(range(nb_clients)):
                 model.load_state_dict(W)
                 model.train()
                 optim = torch.optim.SGD(model.parameters(), lr=args.lr)
@@ -211,8 +217,10 @@ if __name__ == '__main__':
                         scheduler.step()
                     if epoch % epochs == epochs-1:
                         accuracies[f'locally_local_{client_id}'].append(get_accuracy(model, mini_dataloader_test))
+            # print mean accuracy over clients
+            print(f"Mean accuracy over clients: {np.mean([accuracies[f'locally_local_{client_id}'][-1] for client_id in range(nb_clients)])}")
         counter_merge += 1
-        for round in range(rounds):
+        for round in tqdm(range(rounds)):
             t1 = time.perf_counter()
             outputs = []
             for client_id in range(nb_clients):
@@ -251,9 +259,9 @@ if __name__ == '__main__':
             step += 1
             elapsed_time = time.perf_counter() - t1
             remaining_time = (time.perf_counter() - t0) * (steps-step)/step
-            print(f"[{merger_name}:{round+1}/{rounds}]: {elapsed_time:.2f}sec/round, remaining time: {fmttime(int(remaining_time))}")
+            # print(f"[{merger_name}:{round+1}/{rounds}]: {elapsed_time:.2f}sec/round, remaining time: {fmttime(int(remaining_time))}")
             accuracies['global-global'].append(get_accuracy(model, testloader))
-            print(f"Global accuracy: {accuracies['global-global'][-1]}")
+            # print(f"Global accuracy: {accuracies['global-global'][-1]}")
             for client_id in range(nb_clients):
                 testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1000, shuffle=False, num_workers=0)
                 accuracies[f'global-local_{client_id}'].append(get_accuracy(model, testclient))
