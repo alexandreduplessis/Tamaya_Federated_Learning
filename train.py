@@ -114,8 +114,8 @@ if __name__ == '__main__':
         mergers = [("FedAvg", Merger_FedAvg())]*1
     elif args.experiment == "exp1":
         mergers = [("FedAvg", Merger_FedAvg()),
-                   ("FedSoftmax", Merger_FedSoft(+20.0)),
-                   ("FedSoftmin", Merger_FedSoft(-20.0))]*10
+                   ("FedSoftmax", Merger_FedSoft(+5.0)),
+                   ("FedSoftmin", Merger_FedSoft(-5.0))]*100
     elif args.experiment == "exp2":
         mergers = [("FedAvg", Merger_FedAvg()),
                    ("FedAvgSmax", Merger_Hybrid([Merger_FedAvg(), Merger_FedSoft(+5.0)],
