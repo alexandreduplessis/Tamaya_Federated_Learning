@@ -364,3 +364,13 @@ if __name__ == '__main__':
                 for client_id in range(nb_clients):
                     file.write(f"[{merger_name}:{client_id}:{client_id}] {', '.join(map(str, accuracies[f'local_{client_id}-local_{client_id}']))}\n")
                 file.write(f"[{merger_name}:pi] {', '.join(map(str, [len(datasets[client_id]['train']) for client_id in range(nb_clients)]))}\n")
+
+        with open(f"./outputs/{output_file}_accs.inf", 'a') as file:
+            file.write(f"[{merger_name}:global:global] {', '.join(map(str, accuracies['global-global']))}\n")
+            for client_id in range(nb_clients):
+                file.write(f"locally_local_{client_id} {', '.join(map(str, accuracies[f'locally_local_{client_id}']))}\n")
+                # file.write(f"[{merger_name}:{client_id}:{client_id}] {', '.join(map(str, accuracies[f'local_{client_id}-local_{client_id}']))}\n")
+                # file.write(f"[{merger_name}:{client_id}:global] {', '.join(map(str, accuracies[f'local_{client_id}-global']))}\n")
+                file.write(f"[{merger_name}:global:{client_id}] {', '.join(map(str, accuracies[f'global-local_{client_id}']))}\n")
+            file.write(f"[{merger_name}:pi] {', '.join(map(str, [len(datasets[client_id]['train']) for client_id in range(nb_clients)]))}\n")
+            file.write(f"[{merger_name}:gain] {', '.join(map(str, accs_gain))}\n")
