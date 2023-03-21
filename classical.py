@@ -8,7 +8,7 @@ from src.accuracy import get_accuracy
 
 if __name__ == "__main__":
     device = 'cuda'
-    epochs = 100
+    epochs = 1
     batchsize = 64
 
     data_train = MNIST(True, device)
@@ -34,4 +34,5 @@ if __name__ == "__main__":
         accs.append(get_accuracy(model, testloader))
         print(f"{epoch+1}/{epochs}: {accs[-1]}")
     print(accs)
+    
 
