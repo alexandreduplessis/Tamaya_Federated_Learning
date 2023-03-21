@@ -38,8 +38,12 @@ from src.utils import reset_parameters, fmttime
 
 
 if __name__ == '__main__':
-    size_list = [100]*500
-    numbers_list = [[0.5, 0.5, 0., 0., 0., 0., 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0.5, 0.5, 0., 0., 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0.5, 0.5, 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0., 0., 0.5, 0.5, 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0., 0., 0., 0., 0.5, 0.5] for _ in range(100)]
+    nb_clients = 100
+    size_client = 15
+    size_list = [size_client]*nb_clients
+    # numbers_list = [[1/3, 1/3, 1/3, 0., 0., 0., 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0., 1/3, 1/3, 1/3, 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0., 0., 0., 1/3, 1/3, 1/3] for _ in range(100)]
+    # each clients gets 2 classes
+    numbers_list = [[1/2, 1/2, 0., 0., 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 1/2, 1/2, 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 1/2, 1/2, 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 1/2, 1/2, 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 0., 0., 1/2, 1/2] for _ in range(nb_clients//5)]
 
     logging.basicConfig(level=logging.INFO,
     format='| %(levelname)s | %(message)s')
@@ -81,7 +85,7 @@ if __name__ == '__main__':
     else:
         print(f"Unknown dataset.")
         exit(1)
-
+    assert len(numbers_list) == args.clients
     model_name = "ConvNet" if args.dataset in ["MNIST", "FMNIST"] else "TFCifar"
     logging.info(f"Model = {model_name}")
     t0 = time.perf_counter()
@@ -123,8 +127,7 @@ if __name__ == '__main__':
     if args.experiment == "mainexp":
         mergers = [("FedAvg", Merger_FedAvg()),
                    ("FedPar", Merger_FedPar()),
-                   ("FedParConv", Merger_FedParConv()),
-                   ("FedSoftmax", Merger_FedSoft(+5.0))]*1
+                   ("FedParConv", Merger_FedParConv())]*1
     elif args.experiment == "partial":
         mergers = [("FedPar", Merger_FedPar())]*1
     elif args.experiment == "exp1":

@@ -186,8 +186,8 @@ def plot_real_accuracy(filename):
     plt.legend()
     plt.xlabel("Round")
     plt.ylabel("Accuracy")
-    plt.title(f"Accuracy averaged over {count} curves for {filename.split('_')[0].split('/')[1]}")
-    plt.savefig("outputs/" + filename.split('_')[0].split('/')[1] + "_gain.png")
+    plt.title(f"Accuracy averaged over {count} curves for {filename.split('.')[0].split('/')[1]}")
+    plt.savefig("outputs/" + filename.split('.')[0].split('/')[1] + ".png")
     plt.show()
 
 if __name__ == "__main__":
