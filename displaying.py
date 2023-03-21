@@ -66,6 +66,10 @@ def plot_real_accuracy(filename):
         small_max_count = 0
         local_count = 0
         small_local_count = 0
+        par_count = 0
+        small_par_count = 0
+        par_conv_count = 0
+        small_par_conv_count = 0
         for line in f:
             # if line starts with "[FedAvg:gain]"
             if line.startswith("[FedAvg:global:") and not line[15] == 'g':
@@ -113,6 +117,35 @@ def plot_real_accuracy(filename):
                     min_gains = pi[client]*np.array([float(x) for x in line.split(f"[FedSoftmin:global:{client}]")[1].split(",")])
                 else:
                     min_gains += pi[client]*np.array([float(x) for x in line.split(f"[FedSoftmin:global:{client}]")[1].split(",")])
+            elif line.startswith("[FedParConv:") and not line[12] == 'p':
+                i0 = 12
+                client_string = ""
+                while line[i0] != ':':
+                    client_string += line[i0]
+                    i0 += 1
+                client = int(client_string)
+                small_par_conv_count += 1
+                if client == 0:
+                    par_conv_count += 1
+                if small_par_conv_count == 1:
+                    par_conv_gains = pi[client]*np.array([float(x) for x in line.split(f"[FedParConv:{client}:{client}]")[1].split(",")])
+                else:
+                    par_conv_gains += pi[client]*np.array([float(x) for x in line.split(f"[FedParConv:{client}:{client}]")[1].split(",")])
+            elif line.startswith("[FedPar:") and not line[8] == 'p':
+                i0 = 8
+                client_string = ""
+                while line[i0] != ':':
+                    client_string += line[i0]
+                    i0 += 1
+                client = int(client_string)
+                small_par_count += 1
+                if client == 0:
+                    par_count += 1
+                if small_par_count == 1:
+                    par_gains = pi[client]*np.array([float(x) for x in line.split(f"[FedPar:{client}:{client}]")[1].split(",")])
+                else:
+                    par_gains += pi[client]*np.array([float(x) for x in line.split(f"[FedPar:{client}:{client}]")[1].split(",")])
+            
             elif line.startswith("locally_local_"):
                 # then convert the rest of the line into list of floats (numbers are separated by ",")
                 i0 = 14
@@ -134,6 +167,14 @@ def plot_real_accuracy(filename):
     	plt.plot(min_gains/min_count, label="FedSoftMin")
     except:
     	print("no min")
+    try:
+        plt.plot(par_conv_gains/par_conv_count, label="FedParConv")
+    except:
+        print("no par_conv")
+    try:
+        plt.plot(par_gains/par_count, label="FedPar")
+    except:
+        print("no par")
     try:
     	plt.plot(max_gains/max_count, label="FedSoftMax")
     except:

@@ -39,7 +39,7 @@ from src.utils import reset_parameters, fmttime
 
 if __name__ == '__main__':
     size_list = [100]*500
-    numbers_list = [[0.1, 0.1, 0., 0., 0., 0., 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0.1, 0.1, 0., 0., 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0.1, 0.1, 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0., 0., 0.1, 0.1, 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0., 0., 0., 0., 0.1, 0.1] for _ in range(100)]
+    numbers_list = [[0.5, 0.5, 0., 0., 0., 0., 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0.5, 0.5, 0., 0., 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0.5, 0.5, 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0., 0., 0.5, 0.5, 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0., 0., 0., 0., 0.5, 0.5] for _ in range(100)]
 
     logging.basicConfig(level=logging.INFO,
     format='| %(levelname)s | %(message)s')
@@ -339,9 +339,6 @@ if __name__ == '__main__':
                     outputs.append(output)
 
                     testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1000, shuffle=False, num_workers=0)
-
-                    accuracies[f'local_{client_id}-local_{client_id}'].append(get_accuracy(model, testclient))
-                    accuracies[f'local_{client_id}-global'].append(get_accuracy(model, testloader))
                 W_list = [merger(outputs, i) for i in range(nb_clients)]
                 model.load_state_dict(W)
 
