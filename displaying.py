@@ -58,8 +58,8 @@ def plot_real_accuracy(filename):
     pi = pi/np.sum(pi)
     with open(filename) as f:
         # for each line
-        count = 0
-        small_count = 0
+        avg_count = 0
+        small_avg_count = 0
         min_count = 0
         small_min_count = 0
         max_count = 0
@@ -72,21 +72,20 @@ def plot_real_accuracy(filename):
         small_par_conv_count = 0
         for line in f:
             # if line starts with "[FedAvg:gain]"
-            if line.startswith("[FedAvg:global:") and not line[15] == 'g':
-                # then convert the rest of the line into list of floats (numbers are separated by ",")
-                i0 = 15
+            if line.startswith("[FedAvg:") and not line[8] == 'p':
+                i0 = 8
                 client_string = ""
-                while line[i0] != ']':
+                while line[i0] != ':':
                     client_string += line[i0]
                     i0 += 1
                 client = int(client_string)
-                small_count += 1
+                small_avg_count += 1
                 if client == 0:
-                    count += 1
-                if small_count == 1:
-                    avg_gains = pi[client]*np.array([float(x) for x in line.split(f"[FedAvg:global:{client}]")[1].split(",")])
+                    avg_count += 1
+                if small_avg_count == 1:
+                    avg_gains = pi[client]*np.array([float(x) for x in line.split(f"[FedAvg:{client}:{client}]")[1].split(",")])
                 else:
-                    avg_gains += pi[client]*np.array([float(x) for x in line.split(f"[FedAvg:global:{client}]")[1].split(",")])
+                    avg_gains += pi[client]*np.array([float(x) for x in line.split(f"[FedAvg:{client}:{client}]")[1].split(",")])
             elif line.startswith("[FedSoftmax:global:") and not line[19] == 'g':
                 # then convert the rest of the line into list of floats (numbers are separated by ",")
                 i0 = 19
@@ -162,7 +161,7 @@ def plot_real_accuracy(filename):
                 else:
                     locally += pi[client]*np.array([float(x) for x in line.split(f"locally_local_{client}")[1].split(",")])
     # plot the list of floats
-    plt.plot(avg_gains/count, label="FedAvg")
+    plt.plot(avg_gains/avg_count, label="FedAvg")
     try:
     	plt.plot(min_gains/min_count, label="FedSoftMin")
     except:
@@ -186,7 +185,7 @@ def plot_real_accuracy(filename):
     plt.legend()
     plt.xlabel("Round")
     plt.ylabel("Accuracy")
-    plt.title(f"Accuracy averaged over {count} curves for {filename.split('.')[0].split('/')[1]}")
+    plt.title(f"Accuracy averaged over {avg_count} curves for {filename.split('.')[0].split('/')[1]}")
     plt.savefig("outputs/" + filename.split('.')[0].split('/')[1] + ".png")
     plt.show()
 

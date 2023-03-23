@@ -38,8 +38,8 @@ from src.utils import reset_parameters, fmttime
 
 
 if __name__ == '__main__':
-    nb_clients = 100
-    size_client = 15
+    nb_clients = 30
+    size_client = 200
     size_list = [size_client]*nb_clients
     # numbers_list = [[1/3, 1/3, 1/3, 0., 0., 0., 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0., 1/3, 1/3, 1/3, 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0., 0., 0., 1/3, 1/3, 1/3] for _ in range(100)]
     # each clients gets 2 classes
@@ -125,11 +125,10 @@ if __name__ == '__main__':
 
     logging.info(f"Experiment: {args.experiment}")
     if args.experiment == "mainexp":
-        mergers = [("FedAvg", Merger_FedAvg()),
-                   ("FedPar", Merger_FedPar()),
+        mergers = [("FedPar", Merger_FedPar()),
                    ("FedParConv", Merger_FedParConv())]*1
-    elif args.experiment == "partial":
-        mergers = [("FedPar", Merger_FedPar())]*1
+    elif args.experiment == "avg":
+        mergers = [("FedAvg", Merger_FedAvg())]*1
     elif args.experiment == "exp1":
         mergers = [("FedAvg", Merger_FedAvg()),
                    ("FedSoftmax", Merger_FedSoft(+20.0)),
@@ -236,8 +235,12 @@ if __name__ == '__main__':
                         accuracies[f'locally_local_{client_id}'].append(get_accuracy(model, mini_dataloader_test))
             # print mean accuracy over clients
             print(f"Mean accuracy over clients: {np.mean([accuracies[f'locally_local_{client_id}'][-1] for client_id in range(nb_clients)])}")
+            with open(f"./outputs/{output_file}_accs.inf", 'a') as file:
+                for client_id in range(nb_clients):
+                    if local_true:
+                        file.write(f"locally_local_{client_id} {', '.join(map(str, accuracies[f'locally_local_{client_id}']))}\n")
         counter_merge += 1
-        if merger_name != "FedPar" and merger_name != "FedParConv":
+        if merger_name != "FedPar" and merger_name != "FedParConv" and merger_name != "FedAvg":
             for round in tqdm(range(rounds)):
                 t1 = time.perf_counter()
                 outputs = []
@@ -310,7 +313,7 @@ if __name__ == '__main__':
                 file.write(f"[{merger_name}:pi] {', '.join(map(str, [len(datasets[client_id]['train']) for client_id in range(nb_clients)]))}\n")
                 if local_true:
                     file.write(f"[{merger_name}:gain] {', '.join(map(str, accs_gain))}\n")
-        elif merger_name == "FedPar" or merger_name == "FedParConv":
+        elif merger_name == "FedPar" or merger_name == "FedParConv" or merger_name == "FedAvg":
             W_list = [copy.deepcopy(model.state_dict()) for _ in range(nb_clients)]
             for round in tqdm(range(rounds)):
                 t1 = time.perf_counter()
