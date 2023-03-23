@@ -41,9 +41,9 @@ if __name__ == '__main__':
     nb_clients = 30
     size_client = 200
     size_list = [size_client]*nb_clients
-    # numbers_list = [[1/3, 1/3, 1/3, 0., 0., 0., 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0., 1/3, 1/3, 1/3, 0., 0.] for _ in range(100)] + [[0., 0., 0., 0., 0., 0., 0., 1/3, 1/3, 1/3] for _ in range(100)]
+    numbers_list = [[1/3, 1/3, 1/3, 0., 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 1/3, 1/3, 1/3, 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 0., 1/3, 1/3, 1/3] for _ in range(nb_clients//5)]
     # each clients gets 2 classes
-    numbers_list = [[1/2, 1/2, 0., 0., 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 1/2, 1/2, 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 1/2, 1/2, 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 1/2, 1/2, 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 0., 0., 1/2, 1/2] for _ in range(nb_clients//5)]
+    # numbers_list = [[1/2, 1/2, 0., 0., 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 1/2, 1/2, 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 1/2, 1/2, 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 1/2, 1/2, 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 0., 0., 1/2, 1/2] for _ in range(nb_clients//5)]
 
     logging.basicConfig(level=logging.INFO,
     format='| %(levelname)s | %(message)s')
