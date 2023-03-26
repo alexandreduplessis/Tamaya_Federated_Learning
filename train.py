@@ -85,7 +85,7 @@ if __name__ == '__main__':
     else:
         print(f"Unknown dataset.")
         exit(1)
-    assert len(numbers_list) == args.clients
+    #assert len(numbers_list) == args.clients
     model_name = "ConvNet" if args.dataset in ["MNIST", "FMNIST"] else "TFCifar"
     logging.info(f"Model = {model_name}")
     t0 = time.perf_counter()
