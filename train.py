@@ -127,6 +127,9 @@ if __name__ == '__main__':
     if args.experiment == "mainexp":
         mergers = [("FedPar", Merger_FedPar()),
                    ("FedParConv", Merger_FedParConv())]*1
+    elif args.experiment == "gaia":
+        mergers = [("FedAvg", Merger_FedAvg()), ("FedSoftmin", Merger_FedTopK(+0.2)), ("FedSoftmax", Merger_Hybrid([Merger_FedAvg(), Merger_FedTopK(+0.2)],
+                                                [0 if (r < 15) else 1 for r in range(rounds)]))]*10
     elif args.experiment == "avg":
         mergers = [("FedAvg", Merger_FedAvg())]*1
     elif args.experiment == "exp1":
