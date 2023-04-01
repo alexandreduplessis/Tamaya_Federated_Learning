@@ -22,7 +22,8 @@ class Merger_FedTopK:
         if k < 0: top_k = heapq.nsmallest(nk, losses, key=lambda cid: losses[cid])
         else: top_k = heapq.nlargest(nk, losses, key=lambda cid: losses[cid])
 
-        return OrderedDict([(name, torch.sum(torch.stack([output.weight[name]*(1./nk if (output.client_id in top_k) else 0.0) for output in outputs]), dim=0)) for name in names])
+        alphas = [1./nk if (output.client_id in top_k) else 0.0 for output in outputs]
+        return OrderedDict([(name, torch.sum(torch.stack([output.weight[name]*(1./nk if (output.client_id in top_k) else 0.0) for output in outputs]), dim=0)) for name in names]), alphas
 
     def reset(self):
         return self

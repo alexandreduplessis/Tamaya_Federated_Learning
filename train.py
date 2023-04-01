@@ -1,5 +1,6 @@
 import argparse
 import copy
+import random
 import logging
 import numpy as np
 import time
@@ -45,7 +46,7 @@ if __name__ == '__main__':
     parser.add_argument("--balanced", type=str, default='iid', help="iid for balanced clients")
     parser.add_argument("--shardsize", type=int, default=30, help="shardsize argument for unbalanced datasets")
     parser.add_argument("--lrmethod", type=str, default="decay", choices=["const", "decay"], help="learning rate method")
-    parser.add_argument("--lr", type=float, default=1e-3, help="learning rate argument")
+    parser.add_argument("--lr", type=float, default=1e-4, help="learning rate argument")
     parser.add_argument("--experiment", type=str, help="names of experiment to run")
     parser.add_argument("--output", type=str, help="output file")
     parser.add_argument("--max", type=float, default=0.81, help="maximum accuracy")
@@ -106,7 +107,12 @@ if __name__ == '__main__':
         shardsize = args.shardsize
 
     logging.info(f"Experiment: {args.experiment}")
-    if args.experiment == "extra1":
+    if args.experiment == "extra2":
+        mergers = [("FedAvg", Merger_FedAvg()),
+                   ("FedSoftMax", Merger_FedSoft(+5.0)),
+                   ("FedTopK", Merger_FedTopK(0.1))]*30
+
+    elif args.experiment == "extra1":
         mergers = [("FedAvg", Merger_FedAvg()),
                    ("FedSoftMax", Merger_FedSoft(+5.0)),
                    ("FedSoftMin", Merger_FedSoft(-5.0))]*500
@@ -162,7 +168,7 @@ if __name__ == '__main__':
     if output_file is None: logging.warning("Output file not defined!")
 
     loss_fn = torch.nn.CrossEntropyLoss(reduction='sum')
-    testloader = torch.utils.data.DataLoader(data_test, batch_size=4, shuffle=False, num_workers=0)
+    testloader = torch.utils.data.DataLoader(data_test, batch_size=1000, shuffle=False, num_workers=0)
 
     steps = len(mergers) * rounds
     step = 0
@@ -183,6 +189,7 @@ if __name__ == '__main__':
         else: datasets = split_dataset_iid(data_train, nb_clients, ratio_test=0.15)
 
         accuracies = {'global-global': [get_accuracy(model, testloader)]}
+        alphas = []
         for client_id in range(nb_clients):
             accuracies[f'local_{client_id}-local_{client_id}'] = []
             accuracies[f'local_{client_id}-global'] = []
@@ -217,11 +224,12 @@ if __name__ == '__main__':
                 output.weight = copy.deepcopy(model.state_dict())
                 outputs.append(output)
 
-                testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=4, shuffle=False, num_workers=0)
+                testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1000, shuffle=False, num_workers=0)
 
-                accuracies[f'local_{client_id}-local_{client_id}'].append(get_accuracy(model, testclient))
-                accuracies[f'local_{client_id}-global'].append(get_accuracy(model, testloader))
-            W = merger(outputs)
+                # accuracies[f'local_{client_id}-local_{client_id}'].append(get_accuracy(model, testclient))
+                # accuracies[f'local_{client_id}-global'].append(get_accuracy(model, testloader))
+            W, alpha = merger(outputs)
+            alphas.append(alpha)
             model.load_state_dict(W)
 
             step += 1
@@ -230,26 +238,45 @@ if __name__ == '__main__':
             print(f"[{merger_name}:{round+1}/{rounds}]: {elapsed_time:.2f}sec/round, remaining time: {fmttime(int(remaining_time))}")
             accuracies['global-global'].append(get_accuracy(model, testloader))
             for client_id in range(nb_clients):
-                testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=4, shuffle=False, num_workers=0)
-                accuracies[f'global-local_{client_id}'].append(get_accuracy(model, testclient))
+                testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1000, shuffle=False, num_workers=0)
+                # accuracies[f'global-local_{client_id}'].append(get_accuracy(model, testclient))
 
-            if accuracies['global-global'][-1] >= args.max: break
+            if accuracies['global-global'][-1] >= args.max:
+                print("Interruption")
+                break
 
         if not os.path.exists("./outputs/"):
             os.mkdir("./outputs/")
 
+        if not os.path.exists(f"./outputs/{output_file}"):
+            os.mkdir(f"./outputs/{output_file}")
         sum_train_sets = sum([len(datasets[client_id]['train']) for client_id in range(nb_clients)])
-        print(f"Final accuracy of global model for local: {np.sum([len(datasets[client_id]['train'])/sum_train_sets*accuracies[f'global-local_{client_id}'][-1] for client_id in range(nb_clients)])}")
-        print(f"Final accuracy of global model for global: {accuracies['global-global'][-1]}")
+        # print(f"Final accuracy of global model for local: {np.sum([len(datasets[client_id]['train'])/sum_train_sets*accuracies[f'global-local_{client_id}'][-1] for client_id in range(nb_clients)])}")
+        # print(f"Final accuracy of global model for global: {accuracies['global-global'][-1]}")
 
+        if not os.path.exists(f"./outputs/{output_file}/{merger_name}/"):
+            os.mkdir(f"./outputs/{output_file}/{merger_name}/")
 
+        run_id = random.randrange(0, 1000)
+        data = {'alphas': np.array(alphas),
+                'global': np.array(accuracies['global-global']),
+                'pi': np.array([len(datasets[client_id]['train']) for client_id in range(nb_clients)])}
 
-        with open(f"./outputs/{output_file}_accs.inf", 'a') as file:
-            file.write(f"[{merger_name}:global:global] {', '.join(map(str, accuracies['global-global']))}\n")
+        if False:
             for client_id in range(nb_clients):
-                file.write(f"[{merger_name}:{client_id}:{client_id}] {', '.join(map(str, accuracies[f'local_{client_id}-local_{client_id}']))}\n")
-                file.write(f"[{merger_name}:{client_id}:global] {', '.join(map(str, accuracies[f'local_{client_id}-global']))}\n")
-                file.write(f"[{merger_name}:global:{client_id}] {', '.join(map(str, accuracies[f'global-local_{client_id}']))}\n")
-            file.write(f"[{merger_name}:pi] {', '.join(map(str, [len(datasets[client_id]['train']) for client_id in range(nb_clients)]))}\n")
+                data[f'local_{client_id}-local_{client_id}'] = np.array(accuracies[f'local_{client_id}-local_{client_id}'])
+                data[f'local_{client_id}-global'] = np.array(accuracies[f'local_{client_id}-global'])
+                data[f'global-local_{client_id}'] = np.array(accuracies[f'global-local_{client_id}'])
+
+        np.savez(f"./outputs/{output_file}/{merger_name}/run_{run_id}.npz", **data)
+
+        if False:
+            with open(f"./outputs/{output_file}_accs.inf", 'a') as file:
+                file.write(f"[{merger_name}:global:global] {', '.join(map(str, accuracies['global-global']))}\n")
+                for client_id in range(nb_clients):
+                    file.write(f"[{merger_name}:{client_id}:{client_id}] {', '.join(map(str, accuracies[f'local_{client_id}-local_{client_id}']))}\n")
+                    file.write(f"[{merger_name}:{client_id}:global] {', '.join(map(str, accuracies[f'local_{client_id}-global']))}\n")
+                    file.write(f"[{merger_name}:global:{client_id}] {', '.join(map(str, accuracies[f'global-local_{client_id}']))}\n")
+                file.write(f"[{merger_name}:pi] {', '.join(map(str, [len(datasets[client_id]['train']) for client_id in range(nb_clients)]))}\n")
 
 
