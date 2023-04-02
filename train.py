@@ -103,7 +103,9 @@ if __name__ == '__main__':
 
     size_client = args.sizeclient
     size_list = [size_client]*nb_clients
-    numbers_list = [[1/3, 1/3, 1/3, 0., 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 1/3, 1/3, 1/3, 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 0., 1/3, 1/3, 1/3] for _ in range(nb_clients//5)]
+    #numbers_list = [[1/3, 1/3, 1/3, 0., 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 1/3, 1/3, 1/3, 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 0., 1/3, 1/3, 1/3] for _ in range(nb_clients//5)]
+
+    numbers_list = [[1/2, 1/2, 0., 0., 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 1/2, 1/2, 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 1/2, 1/2, 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 1/2, 1/2, 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 0., 0., 1/2, 1/2] for _ in range(nb_clients//5)]
 
     logging.info(f"Number of rounds = {args.rounds}")
     rounds = args.rounds
