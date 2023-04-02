@@ -3,6 +3,8 @@ import os
 import matplotlib.pyplot as plt
 # for args
 import argparse
+# for interpolation by 1/t, 1/t^2, 1/t^3 ...
+from scipy.interpolate import interp1d
 
 def accuracy_display(directorypath):
     merger_names = {}
@@ -16,7 +18,6 @@ def accuracy_display(directorypath):
             new_dict = np.load(os.path.join(directorypath, filename), allow_pickle=True).item()
             if merger_name not in merger_names:
                 merger_names[merger_name] = 1
-                print(np.mean(new_dict[0]), np.mean(new_dict[1]))
                 merger_accs[merger_name] = np.array([np.mean(new_dict[round]) for round in range(len(new_dict))])
             else:
                 merger_names[merger_name] += 1
@@ -29,6 +30,7 @@ def accuracy_display(directorypath):
     for merger_name in merger_names:
         plt.plot(merger_accs[merger_name], label=merger_name)
     plt.legend()
+    plt.title("Number of curves: " + str(merger_names["FedAvg"]))
     plt.show()
 
 def loss_display(directorypath):
@@ -60,6 +62,7 @@ def loss_display(directorypath):
 def loss_train_display(directorypath):
     merger_names = {}
     merger_losses = {}
+    merger_autocorrelation = {}
     # Load the dictionaries in all files of directorypath with name beginning by "accuracies_"
     for filename in os.listdir(directorypath):
         if filename.startswith("train_accuracies_"):
@@ -70,17 +73,32 @@ def loss_train_display(directorypath):
             if merger_name not in merger_names:
                 merger_names[merger_name] = 1
                 merger_losses[merger_name] = np.array([np.mean(new_dict[round]) for round in range(len(new_dict))])
+                # compute the lag one difference
+                diffs = np.diff(merger_losses[merger_name])
+                # compute correlation as std of diffs divided by sthe absolute value of the mean of diffs
+                merger_autocorrelation[merger_name] = np.std(diffs)/np.abs(np.mean(diffs))
             else:
                 merger_names[merger_name] += 1
+                # take the minimum between the two values
                 merger_losses[merger_name] += [np.mean(new_dict[round]) for round in range(len(new_dict))]
+                # compute autocorrelation
+                diffs = np.diff(merger_losses[merger_name])
+                merger_autocorrelation[merger_name] += np.std(diffs)/np.abs(np.mean(diffs))
+                # plt.plot([np.mean(new_dict[round]) for round in range(len(new_dict))], label=merger_name)
+                # plt.legend()
+                # plt.title(merger_name)
+                # plt.show()
     # Divide the values of mrger_accs by the corresponding values of merger_names
     for merger_name in merger_names:
         merger_losses[merger_name] /= merger_names[merger_name]
+        merger_autocorrelation[merger_name] /= merger_names[merger_name]
+        print(merger_name, merger_autocorrelation[merger_name])
     
     # plot merger_accs[merger_name] for each merger_name
     for merger_name in merger_names:
         plt.plot(merger_losses[merger_name], label=merger_name)
     plt.legend()
+    plt.title("Number of curves: " + str(merger_names["FedAvg"]))
     plt.show()
 
 def loss_train_matrix_display(directorypath):
@@ -136,8 +154,9 @@ def print_info(directorypath):
     info = np.load(os.path.join(directorypath, "info.npy"), allow_pickle=True).item()
     for key in info:
         print(key, ":", info[key])
+    return info["nb_clients"]
 
-def alpha_display(directorypath):
+def alpha_display(directorypath, pi):
     merger_names = {}
     merger_alphas = {}
     # Load the dictionaries in all files of directorypath with name beginning by "accuracies_"
@@ -157,7 +176,38 @@ def alpha_display(directorypath):
     for merger_name in merger_names:
         # plot the matrix of alphas
         print(merger_name)
-        plt.imshow(merger_alphas[merger_name], label=merger_name)
+        matrix = np.array(merger_alphas[merger_name])
+        # remove first line
+        # matrix = matrix[2:]
+        # # remove half of the lines (keep only the first half)
+        # matrix = matrix[:len(matrix)//2]
+        nb_values = 10
+        # for each line of matrix put the nb_values highest values to 1 and the others to 0
+        # also take the sum of the alpha values for the values set to 1
+        sum_list = []
+        for i in range(len(matrix)):
+            # get the indices of the nb_values highest values
+            indices = np.argpartition(matrix[i], -nb_values)[-nb_values:]
+            sum_list.append(np.sum(matrix[i][indices]))
+            # set the nb_values highest values to 1
+            matrix[i][indices] = 1
+            # set the others to 0
+            matrix[i][np.argwhere(matrix[i] != 1)] = 0
+
+        plt.imshow(matrix, label=merger_name)
+        plt.legend()
+        plt.show()
+        plt.plot(sum_list, label=merger_name)
+        plt.legend()
+        plt.show()
+        # take the absolute value of the alphas minus pi for each value of alpha
+        norm_matrix = np.abs(np.array(merger_alphas[merger_name]) - pi)
+        # average over the clients
+        norm_matrix_avg = np.mean(norm_matrix, axis=1)
+        # take inverse
+        norm_matrix_avg = 1 / norm_matrix_avg
+
+        plt.plot(norm_matrix_avg, label=merger_name)
         plt.legend()
         plt.show()
 
@@ -178,6 +228,7 @@ if __name__ == "__main__":
     parser.add_argument("--loss_train_matrix", type=int, default=0, help="Display the loss matrix")
     parser.add_argument("--loss_train", type=int, default=0, help="Display the loss matrix")
     args = parser.parse_args()
+    pi = 1 / print_info(args.dir)
     if args.accs:
         accuracy_display(args.dir)
     if args.losses:
@@ -185,7 +236,7 @@ if __name__ == "__main__":
     if args.info:
         print_info(args.dir)
     if args.alphas:
-        alpha_display(args.dir)
+        alpha_display(args.dir, pi)
     if args.loss_matrix:
         loss_matrix_display(args.dir)
     if args.loss_train_matrix:
