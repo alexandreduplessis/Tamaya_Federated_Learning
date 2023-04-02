@@ -16,10 +16,11 @@ def accuracy_display(directorypath):
             new_dict = np.load(os.path.join(directorypath, filename), allow_pickle=True).item()
             if merger_name not in merger_names:
                 merger_names[merger_name] = 1
-                merger_accs[merger_name] = [np.mean(new_dict[round] for round in len(new_dict))]
+                print(np.mean(new_dict[0]), np.mean(new_dict[1]))
+                merger_accs[merger_name] = np.array([np.mean(new_dict[round]) for round in range(len(new_dict))])
             else:
                 merger_names[merger_name] += 1
-                merger_accs[merger_name] += [np.mean(new_dict[round] for round in len(new_dict))]
+                merger_accs[merger_name] += [np.mean(new_dict[round]) for round in range(len(new_dict))]
     # Divide the values of merger_accs by the corresponding values of merger_names
     for merger_name in merger_names:
         merger_accs[merger_name] /= merger_names[merger_name]
@@ -35,18 +36,18 @@ def loss_display(directorypath):
     merger_losses = {}
     # Load the dictionaries in all files of directorypath with name beginning by "accuracies_"
     for filename in os.listdir(directorypath):
-        if filename.startswith("losses_"):
+        if filename.startswith("loss_dict_"):
             # get the string between "accuracies_" and the next "_"
-            merger_name = filename.split("_")[1]
+            merger_name = filename.split("_")[2]
             # load the dictionary
             new_dict = np.load(os.path.join(directorypath, filename), allow_pickle=True).item()
             if merger_name not in merger_names:
                 merger_names[merger_name] = 1
-                merger_losses[merger_name] = [np.mean(new_dict[round] for round in len(new_dict))]
+                merger_losses[merger_name] = np.array([np.mean(new_dict[round]) for round in range(len(new_dict))])
             else:
                 merger_names[merger_name] += 1
-                merger_losses[merger_name] += [np.mean(new_dict[round] for round in len(new_dict))]
-    # Divide the values of merger_accs by the corresponding values of merger_names
+                merger_losses[merger_name] += [np.mean(new_dict[round]) for round in range(len(new_dict))]
+    # Divide the values of mrger_accs by the corresponding values of merger_names
     for merger_name in merger_names:
         merger_losses[merger_name] /= merger_names[merger_name]
     
@@ -59,6 +60,8 @@ def loss_display(directorypath):
 def print_info(directorypath):
     # load the dictionary in the file of name "info"
     info = np.load(os.path.join(directorypath, "info.npy"), allow_pickle=True).item()
+    for key in info:
+        print(key, ":", info[key])
 
 def alpha_display(directorypath):
     merger_names = {}
@@ -72,7 +75,7 @@ def alpha_display(directorypath):
             new_dict = np.load(os.path.join(directorypath, filename), allow_pickle=True).item()
             if merger_name not in merger_names:
                 merger_names[merger_name] = 1
-                merger_alphas[merger_name] = [new_dict[round] for round in len(new_dict)]
+                merger_alphas[merger_name] = [new_dict[round] for round in range(len(new_dict))]
             else:
                 a = 1
     

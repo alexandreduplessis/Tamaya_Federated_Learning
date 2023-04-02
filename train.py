@@ -332,3 +332,4 @@ if __name__ == '__main__':
         # save in a npy file the accuracies and the losses
         np.save("./outputs/" + datetime_string + "/accuracies_" + merger_name + "_" + str(counter_merge // nb_exp) + ".npy", accuracies_dict)
         np.save("./outputs/" + datetime_string + "/loss_dict_" + merger_name + "_" + str(counter_merge // nb_exp) + ".npy", loss_dict)
+        np.save("./outputs/" + datetime_string + "/alpha_dict_" + merger_name + "_" + str(counter_merge // nb_exp) + ".npy", alpha_dict)
