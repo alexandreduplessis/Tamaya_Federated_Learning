@@ -151,10 +151,10 @@ if __name__ == '__main__':
                                                 [1 if (r < 20) else 0 for r in range(rounds)]))]*100
     elif args.experiment == "exp3":
         mergers = [("FedAvg", Merger_FedAvg()),
-                   ("FedSoftmax", Merger_FedSoft(+3.0)),
-                   ("FedSoftmin", Merger_FedSoft(-3.0)),
-                   ("FedMink1", Merger_FedTopK(-0.05)),
-                   ("FedMink2", Merger_FedTopK(-0.1)),
+                   ("FedSoftmax1", Merger_FedSoft(+5.0)),
+                   ("FedSoftmax2", Merger_FedSoft(+20.0)),
+                   ("FedSoftmin1", Merger_FedSoft(-5.0)),
+                   ("FedSoftmin2", Merger_FedSoft(-20.0)),
                    ("FedMink3", Merger_FedTopK(-0.2)),
                    ("FedMink4", Merger_FedTopK(-0.4))]*10
     elif args.experiment == "exp4":
