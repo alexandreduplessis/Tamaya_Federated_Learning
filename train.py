@@ -148,7 +148,10 @@ if __name__ == '__main__':
                                                 [1 if (r < 20) else 0 for r in range(rounds)]))]*100
     elif args.experiment == "exp3":
         mergers = [("FedAvg", Merger_FedAvg()),
-                   ("FedMink", Merger_FedTopK(-0.05))]*10
+                   ("FedMink1", Merger_FedTopK(-0.05)),
+                   ("FedMink2", Merger_FedTopK(-0.1)),
+                   ("FedMink3", Merger_FedTopK(-0.2)),
+                   ("FedMink4", Merger_FedTopK(-0.4))]*10
     elif args.experiment == "exp4":
         mergers = [("FedAvg", Merger_FedAvg()),
                    ("FedWCostAvg", Merger_FedWCostAvg(0.5))]*100
@@ -277,7 +280,7 @@ if __name__ == '__main__':
                     accuracies[f'local_{client_id}-local_{client_id}'].append(get_accuracy(model, testclient))
                     accuracies[f'local_{client_id}-global'].append(get_accuracy(model, testloader))
                 accs_list = [accuracies[f'local_{client_id}-local_{client_id}'][-1] for client_id in range(nb_clients)]
-                if merger_name == "FedMaxk" or merger_name == "FedMink":
+                if merger_name == "FedMaxk" or merger_name == "FedMink1" or merger_name == "FedMink2" or merger_name == "FedMink3" or merger_name == "FedMink4":
                     W = merger(outputs, accs_list)
                 else:
                     W = merger(outputs)

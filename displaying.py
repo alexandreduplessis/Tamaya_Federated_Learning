@@ -86,9 +86,9 @@ def plot_real_accuracy(filename):
                     avg_gains = pi[client]*np.array([float(x) for x in line.split(f"[FedAvg:{client}:{client}]")[1].split(",")])
                 else:
                     avg_gains += pi[client]*np.array([float(x) for x in line.split(f"[FedAvg:{client}:{client}]")[1].split(",")])
-            elif line.startswith("[FedSoftmax:global:") and not line[19] == 'g':
+            elif line.startswith("[FedMink:global:") and not line[16] == 'g':
                 # then convert the rest of the line into list of floats (numbers are separated by ",")
-                i0 = 19
+                i0 = 16
                 client_string = ""
                 while line[i0] != ']':
                     client_string += line[i0]
@@ -98,9 +98,9 @@ def plot_real_accuracy(filename):
                 if client == 0:
                     max_count += 1
                 if small_max_count == 1:
-                    max_gains = pi[client]*np.array([float(x) for x in line.split(f"[FedSoftmax:global:{client}]")[1].split(",")])
+                    max_gains = pi[client]*np.array([float(x) for x in line.split(f"[FedMink:global:{client}]")[1].split(",")])
                 else:
-                    max_gains += pi[client]*np.array([float(x) for x in line.split(f"[FedSoftmax:global:{client}]")[1].split(",")])
+                    max_gains += pi[client]*np.array([float(x) for x in line.split(f"[FedMink:global:{client}]")[1].split(",")])
             elif line.startswith("[FedSoftmin:global:") and not line[19] == 'g':
                 # then convert the rest of the line into list of floats (numbers are separated by ",")
                 i0 = 19
