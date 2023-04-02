@@ -274,8 +274,8 @@ if __name__ == '__main__':
                 loc_loss_dict[client_id] = loss_list
             print(f"Mean accuracy over clients: {np.mean([loc_accuracies[client_id][-1] for client_id in range(nb_clients)])}")
             # save in a npy file the accuracies and the losses
-            np.save("./outputs/" + datetime_string + "/loc_accuracies_" + "local" + str(counter_merge // nb_exp) + ".npy", loc_accuracies)
-            np.save("./outputs/" + datetime_string + "/loc_loss_dict_" + "local" + str(counter_merge // nb_exp) + ".npy", loc_loss_dict)
+            np.save("./outputs/" + datetime_string + "/loc_accuracies_" + "local_" + str(counter_merge // nb_exp) + ".npy", loc_accuracies)
+            np.save("./outputs/" + datetime_string + "/loc_loss_dict_" + "local_" + str(counter_merge // nb_exp) + ".npy", loc_loss_dict)
 
         counter_merge += 1
         
@@ -330,5 +330,5 @@ if __name__ == '__main__':
                 break
 
         # save in a npy file the accuracies and the losses
-        np.save("./outputs/" + datetime_string + "/accuracies_" + merger_name + str(counter_merge // nb_exp) + ".npy", accuracies_dict)
-        np.save("./outputs/" + datetime_string + "/loss_dict_" + merger_name + str(counter_merge // nb_exp) + ".npy", loss_dict)
+        np.save("./outputs/" + datetime_string + "/accuracies_" + merger_name + "_" + str(counter_merge // nb_exp) + ".npy", accuracies_dict)
+        np.save("./outputs/" + datetime_string + "/loss_dict_" + merger_name + "_" + str(counter_merge // nb_exp) + ".npy", loss_dict)
