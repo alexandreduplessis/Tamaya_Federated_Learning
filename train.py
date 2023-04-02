@@ -51,6 +51,7 @@ if __name__ == '__main__':
     parser.add_argument("--batch", type=int, default=64, help="batch size")
     parser.add_argument("--rounds", type=int, default=100, help="nb of rounds")
     parser.add_argument("--nbexp", type=int, default=1, help="nb of differente methods tested")
+    parser.add_argument("--sizeclient", type=int, default=200, help="nb of samples per client")
     parser.add_argument("--epochs", type=int, default=1, help="nb of local epochs")
     parser.add_argument("--balanced", type=str, default='iid', help="iid for balanced clients")
     parser.add_argument("--shardsize", type=int, default=30, help="shardsize argument for unbalanced datasets")
@@ -59,6 +60,8 @@ if __name__ == '__main__':
     parser.add_argument("--experiment", type=str, help="names of experiment to run")
     parser.add_argument("--output", type=str, help="output file")
     parser.add_argument("--max", type=float, default=0.81, help="maximum accuracy")
+    parser.add_argument("--topk", type=float, default=0.1, help="maximum accuracy")
+    parser.add_argument("--softmin", type=float, default=0.1, help="alpha parameter for hybrid")
     parser.add_argument("--local_true", type=bool, default=False, help="whether or not to do local training")
     args = parser.parse_args()
 
@@ -98,7 +101,7 @@ if __name__ == '__main__':
     nb_clients = args.clients
     nb_exp = args.nbexp
 
-    size_client = 200
+    size_client = args.sizeclient
     size_list = [size_client]*nb_clients
     numbers_list = [[1/3, 1/3, 1/3, 0., 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 1/3, 1/3, 1/3, 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 0., 1/3, 1/3, 1/3] for _ in range(nb_clients//5)]
 
@@ -148,6 +151,8 @@ if __name__ == '__main__':
                                                 [1 if (r < 20) else 0 for r in range(rounds)]))]*100
     elif args.experiment == "exp3":
         mergers = [("FedAvg", Merger_FedAvg()),
+                   ("FedSoftmax", Merger_FedSoft(+3.0))
+                   ("FedSoftmin", Merger_FedSoft(-3.0)),
                    ("FedMink1", Merger_FedTopK(-0.05)),
                    ("FedMink2", Merger_FedTopK(-0.1)),
                    ("FedMink3", Merger_FedTopK(-0.2)),
@@ -190,8 +195,39 @@ if __name__ == '__main__':
     step = 0
     t0 = time.perf_counter()
     counter_merge = 0
-    accuracies = {}
+    info = {}
+    
+    if not os.path.exists("./outputs/"):
+        os.mkdir("./outputs/")
+    # create a folder for the experiment with the current date and time
+    import datetime
+    datetime_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    if not os.path.exists("./outputs/" + datetime_string):
+        os.mkdir("./outputs/" + datetime_string)
+
+
+    # put all the parameters in the info dictionary
+    info["nb_clients"] = args.clients
+    info["nb_exp"] = args.nbexp
+    info["rounds"] = args.rounds
+    info["epochs"] = args.epochs
+    info["local_true"] = args.local_true
+    info["balanced"] = args.balanced
+    info["shardsize"] = args.shardsize
+    info["lr"] = args.lr
+    info["experiment"] = args.experiment
+    info["sizeclient"] = args.sizeclient
+    info["batch"] = args.batch
+    info["dataset"] = args.dataset
+    info["device"] = args.device
+
+    # save the info dictionary in a npy file
+    np.save("./outputs/" + datetime_string + "/info.npy", info)
+
     for merger_name, merger in mergers:
+        accuracies_dict = {}
+        loss_dict = {}
+        alpha_dict = {}
         print(f"[{merger_name}] Begin...")
         merger.reset()
         if counter_merge % nb_exp == 0:
@@ -205,30 +241,26 @@ if __name__ == '__main__':
         if counter_merge % nb_exp == 0:
             if not(balanced): datasets = split_dataset_noniid(data_train, nb_clients, size_list, numbers_list, ratio_test=0.15)
             else: datasets = split_dataset_iid(data_train, nb_clients, ratio_test=0.15)
+            testloader = torch.utils.data.DataLoader(data_test, batch_size=1000, shuffle=False, num_workers=0)
+            # define test and train dataloaders for each client
+            train_dataloaders = [torch.utils.data.DataLoader(datasets[client_id]['train'], batch_size=batchsize, shuffle=True, num_workers=0) for client_id in range(nb_clients)]
+            test_dataloaders = [torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1, shuffle=False, num_workers=0) for client_id in range(nb_clients)]
         
-        # union_of_testsets = torch.utils.data.ConcatDataset([datasets[client_id]['test'] for client_id in range(nb_clients)])
-        # testloader = torch.utils.data.DataLoader(union_of_testsets, batch_size=1, shuffle=False, num_workers=0)
-        testloader = torch.utils.data.DataLoader(data_test, batch_size=1000, shuffle=False, num_workers=0)
 
-        accuracies['global-global'] = []
-        for client_id in range(nb_clients):
-            accuracies[f'local_{client_id}-local_{client_id}'] = []
-            accuracies[f'local_{client_id}-global'] = []
-            accuracies[f'global-local_{client_id}'] = []
-            if counter_merge % nb_exp == 0:
-                accuracies[f'locally_local_{client_id}'] = []
 
         if counter_merge % nb_exp == 0 and local_true:
-            print("Apprentissage classique...")
+            print("Apprentissage localolocal...")
+            loc_accuracies = {}
+            loc_loss_dict = {}
             for client_id in tqdm(range(nb_clients)):
+                accuracies_list = []
+                loss_list = []
                 model.load_state_dict(W)
                 model.train()
                 optim = torch.optim.SGD(model.parameters(), lr=args.lr)
                 scheduler = StepLR(optim, step_size=epochs, gamma=0.99)
-                mini_dataloader = torch.utils.data.DataLoader(datasets[client_id]['train'], batch_size=batchsize, shuffle=True, num_workers=0)
-                mini_dataloader_test = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1, shuffle=False, num_workers=0)
                 for epoch in range(epochs*rounds):
-                    for (x, y) in mini_dataloader:
+                    for (x, y) in train_dataloaders[client_id]:
                         optim.zero_grad()
                         y_out = model(x)
                         loss = loss_fn(y_out, y)
@@ -236,143 +268,67 @@ if __name__ == '__main__':
                         optim.step()
                         scheduler.step()
                     if epoch % epochs == epochs-1:
-                        accuracies[f'locally_local_{client_id}'].append(get_accuracy(model, mini_dataloader_test))
+                        loss_list.append(loss.item())
+                        accuracies_list.append(get_accuracy(model,test_dataloaders[client_id]))
+                loc_accuracies[client_id] = accuracies_list
+                loc_loss_dict[client_id] = loss_list
+            print(f"Mean accuracy over clients: {np.mean([loc_accuracies[client_id][-1] for client_id in range(nb_clients)])}")
+            # save in a npy file the accuracies and the losses
+            np.save("./outputs/" + datetime_string + "/loc_accuracies_" + "local" + str(counter_merge // nb_exp) + ".npy", loc_accuracies)
+            np.save("./outputs/" + datetime_string + "/loc_loss_dict_" + "local" + str(counter_merge // nb_exp) + ".npy", loc_loss_dict)
 
-            # print mean accuracy over clients
-            print(f"Mean accuracy over clients: {np.mean([accuracies[f'locally_local_{client_id}'][-1] for client_id in range(nb_clients)])}")
-            with open(f"./outputs/{output_file}_accs.inf", 'a') as file:
-                for client_id in range(nb_clients):
-                    if local_true:
-                        file.write(f"locally_local_{client_id} {', '.join(map(str, accuracies[f'locally_local_{client_id}']))}\n")
         counter_merge += 1
-        if merger_name != "FedPar" and merger_name != "FedParConv" and merger_name != "FedAvg":
-            for round in tqdm(range(rounds)):
-                t1 = time.perf_counter()
-                outputs = []
-                for client_id in range(nb_clients):
-                    output = ClientOutput(client_id)
-                    output.size = len(datasets[client_id]['train'])
-                    output.losses = []
-                    output.round = round
+        
+        for round in tqdm(range(rounds)):
+            accuracies_list = []
+            loss_list = []
+            t1 = time.perf_counter()
+            outputs = []
 
-                    model.load_state_dict(W)
-                    model.train()
-                    optim = torch.optim.SGD(model.parameters(), lr=learningrates[round])
+            for client_id in range(nb_clients):
+                output = ClientOutput(client_id)
+                output.size = len(datasets[client_id]['train'])
+                output.losses = []
+                output.round = round
 
-                    dataloader = torch.utils.data.DataLoader(datasets[client_id]['train'], batch_size=batchsize, shuffle=True, num_workers=0)
-                    for epoch in range(epochs):
-                        output.losses.append(0.0)
-                        for (x, y) in dataloader:
-                            optim.zero_grad()
-                            y_out = model(x)
-                            loss = loss_fn(y_out, y)
-                            with torch.no_grad():
-                                output.losses[-1] += loss.detach().item()
-                            loss.backward()
-                            optim.step()
-                        output.losses[-1] /= output.size
-
-                    output.weight = copy.deepcopy(model.state_dict())
-                    outputs.append(output)
-
-                    testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1000, shuffle=False, num_workers=0)
-
-                    accuracies[f'local_{client_id}-local_{client_id}'].append(get_accuracy(model, testclient))
-                    accuracies[f'local_{client_id}-global'].append(get_accuracy(model, testloader))
-                accs_list = [accuracies[f'local_{client_id}-local_{client_id}'][-1] for client_id in range(nb_clients)]
-                if merger_name == "FedMaxk" or merger_name == "FedMink1" or merger_name == "FedMink2" or merger_name == "FedMink3" or merger_name == "FedMink4":
-                    W = merger(outputs, accs_list)
-                else:
-                    W = merger(outputs)
                 model.load_state_dict(W)
+                model.train()
+                optim = torch.optim.SGD(model.parameters(), lr=learningrates[round])
+                
+                for epoch in range(epochs):
+                    output.losses.append(0.0)
+                    for (x, y) in train_dataloaders[client_id]:
+                        optim.zero_grad()
+                        y_out = model(x)
+                        loss = loss_fn(y_out, y)
+                        with torch.no_grad():
+                            output.losses[-1] += loss.detach().item()
+                        loss.backward()
+                        optim.step()
+                    output.losses[-1] /= output.size
+                # update loss_list
+                loss_list.append(output.losses[-1])
+                accuracies_list.append(get_accuracy(model,test_dataloaders[client_id]))
 
-                step += 1
-                elapsed_time = time.perf_counter() - t1
-                remaining_time = (time.perf_counter() - t0) * (steps-step)/step
-                # print(f"[{merger_name}:{round+1}/{rounds}]: {elapsed_time:.2f}sec/round, remaining time: {fmttime(int(remaining_time))}")
-                accuracies['global-global'].append(get_accuracy(model, testloader))
-                # print(f"Global accuracy: {accuracies['global-global'][-1]}")
-                for client_id in range(nb_clients):
-                    testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1000, shuffle=False, num_workers=0)
-                    accuracies[f'global-local_{client_id}'].append(get_accuracy(model, testclient))
+                output.weight = copy.deepcopy(model.state_dict())
+                outputs.append(output)
 
+            # update accuracies_dict and loss_dict
+            accuracies_dict[round] = accuracies_list
+            loss_dict[round] = loss_list
 
-                if accuracies['global-global'][-1] >= args.max: break
+            W, alpha = merger(outputs, accuracies_dict[round])
+            model.load_state_dict(W)
+            alpha_dict[round] = alpha
+            
+            step += 1
+            elapsed_time = time.perf_counter() - t1
+            remaining_time = (time.perf_counter() - t0) * (steps-step)/step
+            
 
-            if not os.path.exists("./outputs/"):
-                os.mkdir("./outputs/")
-            sum_train_sets = sum([len(datasets[client_id]['train']) for client_id in range(nb_clients)])
-            print(f"Final accuracy of global model for local: {np.sum([len(datasets[client_id]['train'])/sum_train_sets*accuracies[f'global-local_{client_id}'][-1] for client_id in range(nb_clients)])}")
-            print(f"Final accuracy of global model for global: {accuracies['global-global'][-1]}")
-            if local_true:
-                accs_gain = [np.sum([(accuracies[f'global-local_{client_id}'][i] - accuracies[f'locally_local_{client_id}'][i])*len(datasets[client_id]['train'])/sum_train_sets for client_id in range(nb_clients)]) for i in range(len(accuracies[f'global-local_{0}']))]
-                ponderated_local = [np.sum([(accuracies[f'locally_local_{client_id}'][i])*len(datasets[client_id]['train'])/sum_train_sets for client_id in range(nb_clients)]) for i in range(len(accuracies[f'global-local_{0}']))]
-                print(f"Locally local: {ponderated_local[-1]}")
-                print(f"Gain: {accs_gain[-1]}")
+            if accuracies_dict[round][-1] > args.max:
+                break
 
-
-            with open(f"./outputs/{output_file}_accs.inf", 'a') as file:
-                file.write(f"[{merger_name}:global:global] {', '.join(map(str, accuracies['global-global']))}\n")
-                for client_id in range(nb_clients):
-                    if local_true:
-                        file.write(f"locally_local_{client_id} {', '.join(map(str, accuracies[f'locally_local_{client_id}']))}\n")
-                    # file.write(f"[{merger_name}:{client_id}:{client_id}] {', '.join(map(str, accuracies[f'local_{client_id}-local_{client_id}']))}\n")
-                    # file.write(f"[{merger_name}:{client_id}:global] {', '.join(map(str, accuracies[f'local_{client_id}-global']))}\n")
-                    file.write(f"[{merger_name}:global:{client_id}] {', '.join(map(str, accuracies[f'global-local_{client_id}']))}\n")
-                file.write(f"[{merger_name}:pi] {', '.join(map(str, [len(datasets[client_id]['train']) for client_id in range(nb_clients)]))}\n")
-                if local_true:
-                    file.write(f"[{merger_name}:gain] {', '.join(map(str, accs_gain))}\n")
-        elif merger_name == "FedPar" or merger_name == "FedParConv" or merger_name == "FedAvg":
-            W_list = [copy.deepcopy(model.state_dict()) for _ in range(nb_clients)]
-            for round in tqdm(range(rounds)):
-                t1 = time.perf_counter()
-                outputs = []
-                for client_id in range(nb_clients):
-                    output = ClientOutput(client_id)
-                    output.size = len(datasets[client_id]['train'])
-                    output.losses = []
-                    output.round = round
-
-                    model.load_state_dict(W_list[client_id])
-                    model.train()
-                    optim = torch.optim.SGD(model.parameters(), lr=learningrates[round])
-
-                    dataloader = torch.utils.data.DataLoader(datasets[client_id]['train'], batch_size=batchsize, shuffle=True, num_workers=0)
-                    for epoch in range(epochs):
-                        output.losses.append(0.0)
-                        for (x, y) in dataloader:
-                            optim.zero_grad()
-                            y_out = model(x)
-                            loss = loss_fn(y_out, y)
-                            with torch.no_grad():
-                                output.losses[-1] += loss.detach().item()
-                            loss.backward()
-                            optim.step()
-                        output.losses[-1] /= output.size
-
-                    output.weight = copy.deepcopy(model.state_dict())
-                    outputs.append(output)
-
-                    testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1000, shuffle=False, num_workers=0)
-                W_list = [merger(outputs, i) for i in range(nb_clients)]
-                model.load_state_dict(W)
-
-                step += 1
-                elapsed_time = time.perf_counter() - t1
-                remaining_time = (time.perf_counter() - t0) * (steps-step)/step
-                for client_id in range(nb_clients):
-                    model.load_state_dict(W_list[client_id])
-                    testclient = torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1000, shuffle=False, num_workers=0)
-                    accuracies[f'local_{client_id}-local_{client_id}'].append(get_accuracy(model, testclient))
-
-
-            if not os.path.exists("./outputs/"):
-                os.mkdir("./outputs/")
-            sum_train_sets = sum([len(datasets[client_id]['train']) for client_id in range(nb_clients)])
-            print(f"Final accuracy for partial update: {np.sum([len(datasets[client_id]['train'])/sum_train_sets*accuracies[f'local_{client_id}-local_{client_id}'][-1] for client_id in range(nb_clients)])}")
-
-
-            with open(f"./outputs/{output_file}_accs.inf", 'a') as file:
-                for client_id in range(nb_clients):
-                    file.write(f"[{merger_name}:{client_id}:{client_id}] {', '.join(map(str, accuracies[f'local_{client_id}-local_{client_id}']))}\n")
-                file.write(f"[{merger_name}:pi] {', '.join(map(str, [len(datasets[client_id]['train']) for client_id in range(nb_clients)]))}\n")
+        # save in a npy file the accuracies and the losses
+        np.save("./outputs/" + datetime_string + "/accuracies_" + merger_name + str(counter_merge // nb_exp) + ".npy", accuracies_dict)
+        np.save("./outputs/" + datetime_string + "/loss_dict_" + merger_name + str(counter_merge // nb_exp) + ".npy", loss_dict)

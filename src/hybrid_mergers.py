@@ -6,8 +6,8 @@ class Merger_Hybrid:
         self.mergers = mergers
         self.indices = indices
 
-    def __call__(self, outputs):
-        return self.mergers[self.indices[outputs[0].round]](outputs)
+    def __call__(self, outputs, accs_list):
+        return self.mergers[self.indices[outputs[0].round]](outputs, accs_list)
 
     def reset(self):
         for merger in self.mergers: merger.reset()

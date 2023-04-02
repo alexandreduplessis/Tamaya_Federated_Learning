@@ -12,7 +12,7 @@ class Merger_FedSoft:
         """
         self.T = T
 
-    def __call__(self, outputs):
+    def __call__(self, outputs, accs_list):
         names = outputs[0].weight.keys()
 
         T = self.T[outputs[0].round] if isinstance(self.T, list) else self.T
@@ -20,7 +20,7 @@ class Merger_FedSoft:
         alpha = {output.client_id: np.exp(T * output.losses[-1]) for output in outputs}
         sum_alpha = sum([alpha[output.client_id] for output in outputs])
 
-        return OrderedDict([(name, torch.sum(torch.stack([output.weight[name]*(alpha[output.client_id]/sum_alpha) for output in outputs]), dim=0)) for name in names])
+        return OrderedDict([(name, torch.sum(torch.stack([output.weight[name]*(alpha[output.client_id]/sum_alpha) for output in outputs]), dim=0)) for name in names]), [alpha[output.client_id]/sum_alpha for output in outputs]
 
     def reset(self):
         return self
