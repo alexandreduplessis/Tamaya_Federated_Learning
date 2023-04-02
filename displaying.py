@@ -57,6 +57,30 @@ def loss_display(directorypath):
     plt.legend()
     plt.show()
 
+def loss_matrix_display(directorypath):
+    merger_names = {}
+    merger_losses = {}
+    # Load the dictionaries in all files of directorypath with name beginning by "accuracies_"
+    for filename in os.listdir(directorypath):
+        if filename.startswith("loss_dict_"):
+            # get the string between "accuracies_" and the next "_"
+            merger_name = filename.split("_")[2]
+            # load the dictionary
+            new_dict = np.load(os.path.join(directorypath, filename), allow_pickle=True).item()
+            if merger_name not in merger_names:
+                merger_names[merger_name] = 1
+                merger_losses[merger_name] = [new_dict[round] for round in range(len(new_dict))]
+            else:
+                a = 1
+    
+    # plot merger_accs[merger_name] for each merger_name
+    for merger_name in merger_names:
+        # plot the matrix of alphas
+        print(merger_name)
+        plt.imshow(merger_losses[merger_name], label=merger_name)
+        plt.legend()
+        plt.show()
+
 def print_info(directorypath):
     # load the dictionary in the file of name "info"
     info = np.load(os.path.join(directorypath, "info.npy"), allow_pickle=True).item()
@@ -68,9 +92,9 @@ def alpha_display(directorypath):
     merger_alphas = {}
     # Load the dictionaries in all files of directorypath with name beginning by "accuracies_"
     for filename in os.listdir(directorypath):
-        if filename.startswith("alphas_"):
+        if filename.startswith("alpha_dict_"):
             # get the string between "accuracies_" and the next "_"
-            merger_name = filename.split("_")[1]
+            merger_name = filename.split("_")[2]
             # load the dictionary
             new_dict = np.load(os.path.join(directorypath, filename), allow_pickle=True).item()
             if merger_name not in merger_names:
@@ -82,9 +106,10 @@ def alpha_display(directorypath):
     # plot merger_accs[merger_name] for each merger_name
     for merger_name in merger_names:
         # plot the matrix of alphas
+        print(merger_name)
         plt.imshow(merger_alphas[merger_name], label=merger_name)
-    plt.legend()
-    plt.show()
+        plt.legend()
+        plt.show()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -99,6 +124,7 @@ if __name__ == "__main__":
     parser.add_argument("--losses", type=int, default=0, help="Display the losses")
     parser.add_argument("--info", type=int, default=0, help="Display the info")
     parser.add_argument("--alphas", type=int, default=0, help="Display the alphas")
+    parser.add_argument("--loss_matrix", type=int, default=0, help="Display the loss matrix")
     args = parser.parse_args()
     if args.accs:
         accuracy_display(args.dir)
@@ -108,3 +134,5 @@ if __name__ == "__main__":
         print_info(args.dir)
     if args.alphas:
         alpha_display(args.dir)
+    if args.loss_matrix:
+        loss_matrix_display(args.dir)

@@ -226,6 +226,7 @@ if __name__ == '__main__':
 
     for merger_name, merger in mergers:
         accuracies_dict = {}
+        train_accuracies_dict = {}
         loss_dict = {}
         alpha_dict = {}
         print(f"[{merger_name}] Begin...")
@@ -281,6 +282,7 @@ if __name__ == '__main__':
         
         for round in tqdm(range(rounds)):
             accuracies_list = []
+            train_accuracies_list = []
             loss_list = []
             t1 = time.perf_counter()
             outputs = []
@@ -309,12 +311,14 @@ if __name__ == '__main__':
                 # update loss_list
                 loss_list.append(output.losses[-1])
                 accuracies_list.append(get_accuracy(model,test_dataloaders[client_id]))
+                train_accuracies_list.append(get_accuracy(model,train_dataloaders[client_id]))
 
                 output.weight = copy.deepcopy(model.state_dict())
                 outputs.append(output)
 
             # update accuracies_dict and loss_dict
             accuracies_dict[round] = accuracies_list
+            train_accuracies_dict[round] = train_accuracies_list
             loss_dict[round] = loss_list
 
             W, alpha = merger(outputs, accuracies_dict[round])
@@ -331,5 +335,6 @@ if __name__ == '__main__':
 
         # save in a npy file the accuracies and the losses
         np.save("./outputs/" + datetime_string + "/accuracies_" + merger_name + "_" + str(counter_merge // nb_exp) + ".npy", accuracies_dict)
+        np.save("./outputs/" + datetime_string + "/train_accuracies_" + merger_name + "_" + str(counter_merge // nb_exp) + ".npy", train_accuracies_dict)
         np.save("./outputs/" + datetime_string + "/loss_dict_" + merger_name + "_" + str(counter_merge // nb_exp) + ".npy", loss_dict)
         np.save("./outputs/" + datetime_string + "/alpha_dict_" + merger_name + "_" + str(counter_merge // nb_exp) + ".npy", alpha_dict)
