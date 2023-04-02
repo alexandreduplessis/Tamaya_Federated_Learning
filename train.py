@@ -200,7 +200,7 @@ if __name__ == '__main__':
     if not os.path.exists("./outputs/"):
         os.mkdir("./outputs/")
     # create a folder for the experiment with the current date and time
-    import datetime
+    from datetime import datetime
     datetime_string = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     if not os.path.exists("./outputs/" + datetime_string):
         os.mkdir("./outputs/" + datetime_string)
