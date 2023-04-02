@@ -64,6 +64,12 @@ def plot_real_accuracy(filename):
         small_min_count = 0
         max_count = 0
         small_max_count = 0
+        max2_count = 0
+        small_max2_count = 0
+        max3_count = 0
+        small_max3_count = 0
+        max4_count = 0
+        small_max4_count = 0
         local_count = 0
         small_local_count = 0
         par_count = 0
@@ -86,9 +92,9 @@ def plot_real_accuracy(filename):
                     avg_gains = pi[client]*np.array([float(x) for x in line.split(f"[FedAvg:{client}:{client}]")[1].split(",")])
                 else:
                     avg_gains += pi[client]*np.array([float(x) for x in line.split(f"[FedAvg:{client}:{client}]")[1].split(",")])
-            elif line.startswith("[FedMink:global:") and not line[16] == 'g':
+            elif line.startswith("[FedMink1:global:") and not line[17] == 'g':
                 # then convert the rest of the line into list of floats (numbers are separated by ",")
-                i0 = 16
+                i0 = 17
                 client_string = ""
                 while line[i0] != ']':
                     client_string += line[i0]
@@ -98,9 +104,54 @@ def plot_real_accuracy(filename):
                 if client == 0:
                     max_count += 1
                 if small_max_count == 1:
-                    max_gains = pi[client]*np.array([float(x) for x in line.split(f"[FedMink:global:{client}]")[1].split(",")])
+                    max_gains = pi[client]*np.array([float(x) for x in line.split(f"[FedMink1:global:{client}]")[1].split(",")])
                 else:
-                    max_gains += pi[client]*np.array([float(x) for x in line.split(f"[FedMink:global:{client}]")[1].split(",")])
+                    max_gains += pi[client]*np.array([float(x) for x in line.split(f"[FedMink1:global:{client}]")[1].split(",")])
+            elif line.startswith("[FedMink2:global:") and not line[17] == 'g':
+                # then convert the rest of the line into list of floats (numbers are separated by ",")
+                i0 = 17
+                client_string = ""
+                while line[i0] != ']':
+                    client_string += line[i0]
+                    i0 += 1
+                client = int(client_string)
+                small_max2_count += 1
+                if client == 0:
+                    max2_count += 1
+                if small_max2_count == 1:
+                    max2_gains = pi[client]*np.array([float(x) for x in line.split(f"[FedMink2:global:{client}]")[1].split(",")])
+                else:
+                    max2_gains += pi[client]*np.array([float(x) for x in line.split(f"[FedMink2:global:{client}]")[1].split(",")])
+            elif line.startswith("[FedMink3:global:") and not line[17] == 'g':
+                # then convert the rest of the line into list of floats (numbers are separated by ",")
+                i0 = 17
+                client_string = ""
+                while line[i0] != ']':
+                    client_string += line[i0]
+                    i0 += 1
+                client = int(client_string)
+                small_max3_count += 1
+                if client == 0:
+                    max3_count += 1
+                if small_max3_count == 1:
+                    max3_gains = pi[client]*np.array([float(x) for x in line.split(f"[FedMink3:global:{client}]")[1].split(",")])
+                else:
+                    max3_gains += pi[client]*np.array([float(x) for x in line.split(f"[FedMink3:global:{client}]")[1].split(",")])
+            elif line.startswith("[FedMink4:global:") and not line[17] == 'g':
+                # then convert the rest of the line into list of floats (numbers are separated by ",")
+                i0 = 17
+                client_string = ""
+                while line[i0] != ']':
+                    client_string += line[i0]
+                    i0 += 1
+                client = int(client_string)
+                small_max4_count += 1
+                if client == 0:
+                    max4_count += 1
+                if small_max4_count == 1:
+                    max4_gains = pi[client]*np.array([float(x) for x in line.split(f"[FedMink4:global:{client}]")[1].split(",")])
+                else:
+                    max4_gains += pi[client]*np.array([float(x) for x in line.split(f"[FedMink4:global:{client}]")[1].split(",")])
             elif line.startswith("[FedSoftmin:global:") and not line[19] == 'g':
                 # then convert the rest of the line into list of floats (numbers are separated by ",")
                 i0 = 19
@@ -175,9 +226,21 @@ def plot_real_accuracy(filename):
     except:
         print("no par")
     try:
-    	plt.plot(max_gains/max_count, label="FedSoftMax")
+        plt.plot(max1_gains/max1_count, label="FedMink1")
     except:
-    	print("no max")
+        print("no max1")
+    try:
+        plt.plot(max2_gains/max2_count, label="FedMink2")
+    except:
+        print("no max2")
+    try:
+        plt.plot(max3_gains/max3_count, label="FedMink3")
+    except:
+        print("no max3")
+    try:
+        plt.plot(max4_gains/max4_count, label="FedMink4")
+    except:
+        print("no max4")
     try:
     	plt.plot(locally/local_count, label="Local")
     except:
