@@ -148,7 +148,6 @@ if __name__ == '__main__':
                                                 [1 if (r < 20) else 0 for r in range(rounds)]))]*100
     elif args.experiment == "exp3":
         mergers = [("FedAvg", Merger_FedAvg()),
-                   ("FedMaxk", Merger_FedTopK(+0.05)),
                    ("FedMink", Merger_FedTopK(-0.05))]*10
     elif args.experiment == "exp4":
         mergers = [("FedAvg", Merger_FedAvg()),
@@ -218,7 +217,6 @@ if __name__ == '__main__':
 
         if counter_merge % nb_exp == 0 and local_true:
             print("Apprentissage classique...")
-            final_loss = []
             for client_id in tqdm(range(nb_clients)):
                 model.load_state_dict(W)
                 model.train()
@@ -236,8 +234,6 @@ if __name__ == '__main__':
                         scheduler.step()
                     if epoch % epochs == epochs-1:
                         accuracies[f'locally_local_{client_id}'].append(get_accuracy(model, mini_dataloader_test))
-                # add the loss of the last epoch
-                final_loss.append(loss.item())
 
             # print mean accuracy over clients
             print(f"Mean accuracy over clients: {np.mean([accuracies[f'locally_local_{client_id}'][-1] for client_id in range(nb_clients)])}")
@@ -280,8 +276,9 @@ if __name__ == '__main__':
 
                     accuracies[f'local_{client_id}-local_{client_id}'].append(get_accuracy(model, testclient))
                     accuracies[f'local_{client_id}-global'].append(get_accuracy(model, testloader))
-                if merger_name == "FedMaxk":
-                    W = merger(outputs, final_loss)
+                accs_list = [accuracies[f'local_{client_id}-local_{client_id}'][-1] for client_id in range(nb_clients)]
+                if merger_name == "FedMaxk" or merger_name == "FedMink":
+                    W = merger(outputs, accs_list)
                 else:
                     W = merger(outputs)
                 model.load_state_dict(W)
