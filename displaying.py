@@ -30,7 +30,7 @@ def accuracy_display(directorypath):
     for merger_name in merger_names:
         plt.plot(merger_accs[merger_name], label=merger_name)
     plt.legend()
-    plt.title("Number of curves: " + str(merger_names["FedAvg"]))
+    # plt.title("Number of curves: " + str(merger_names["FedAvg"]))
     plt.show()
 
 def loss_display(directorypath):
@@ -96,9 +96,10 @@ def loss_train_display(directorypath):
     
     # plot merger_accs[merger_name] for each merger_name
     for merger_name in merger_names:
-        plt.plot(merger_losses[merger_name], label=merger_name)
+        if merger_name != "FedSoftMin":
+            plt.plot(merger_losses[merger_name], label=merger_name)
     plt.legend()
-    plt.title("Number of curves: " + str(merger_names["FedAvg"]))
+    # plt.title("Number of curves: " + str(merger_names["FedAvg"]))
     plt.show()
 
 def loss_train_matrix_display(directorypath):
@@ -194,22 +195,22 @@ def alpha_display(directorypath, pi):
             # set the others to 0
             matrix[i][np.argwhere(matrix[i] != 1)] = 0
 
-        plt.imshow(matrix, label=merger_name)
-        plt.legend()
-        plt.show()
-        plt.plot(sum_list, label=merger_name)
-        plt.legend()
-        plt.show()
+        # plt.imshow(matrix, label=merger_name)
+        # plt.legend()
+        # plt.show()
+        # plt.plot(sum_list, label=merger_name)
+        # plt.legend()
+        # plt.show()
         # take the absolute value of the alphas minus pi for each value of alpha
         norm_matrix = np.abs(np.array(merger_alphas[merger_name]) - pi)
         # average over the clients
         norm_matrix_avg = np.mean(norm_matrix, axis=1)
         # take inverse
-        norm_matrix_avg = 1 / norm_matrix_avg
+        norm_matrix_avg =  norm_matrix_avg
 
         plt.plot(norm_matrix_avg, label=merger_name)
-        plt.legend()
-        plt.show()
+    plt.legend()
+    plt.show()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
