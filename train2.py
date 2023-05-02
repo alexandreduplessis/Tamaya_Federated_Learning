@@ -29,7 +29,7 @@ from src.datasplitting import split_dataset_iid, split_dataset_noniid
 
 # strategies
 from src.client_output import ClientOutput
-from src.classic_mergers import Merger_FedAvg
+from src.classic_mergers import Merger_FedAvg, Merger_Layer
 from src.classic_mergers_partial import Merger_FedPar
 from src.classic_mergers_partial_conv import Merger_FedParConv
 from src.soft_mergers import Merger_FedSoft, Merger_FedSuperSoft, Merger_FednegHess, Merger_FedHess, Merger_FedSoftTop
@@ -149,8 +149,10 @@ if __name__ == '__main__':
         mergers = [("FedPar", Merger_FedPar()),
                    ("FedParConv", Merger_FedParConv())]*1
     elif args.experiment == "avgonly":
-        mergers = [("FedAvg", Merger_FedAvg())]*1
-        nb_exp = 1
+        mergers = [("FedAvg", Merger_FedAvg()),
+                   ("FedLayer", Merger_Layer()),
+                   ]*1
+        nb_exp = 2
     elif args.experiment == "soft":
         mergers = [("FedAvg", Merger_FedAvg()),
                    ("FedSoftMax5", Merger_FedSoft(+5.0)),
@@ -274,68 +276,7 @@ if __name__ == '__main__':
             union_test_dataset = torch.utils.data.ConcatDataset(datasets[client_id]['test'] for client_id in range(nb_clients))
             union_test_dataloader = torch.utils.data.DataLoader(union_test_dataset, batch_size=1, shuffle=False, num_workers=0)
 
-        if counter_merge % nb_exp == 0 and local_true:
-            print("Apprentissage localolocal...")
-            loc_accuracies = {}
-            loc_loss_dict = {}
-            for client_id in tqdm(range(nb_clients)):
-                accuracies_list = []
-                loss_list = []
-                model.load_state_dict(W)
-                model.train()
-                optim = torch.optim.SGD(model.parameters(), lr=args.lr)
-                scheduler = StepLR(optim, step_size=epochs, gamma=0.99)
-                for epoch in range(epochs*rounds):
-                    for (x, y) in train_dataloaders[client_id]:
-                        model.train()
-                        optim.zero_grad()
-                        y_out = model(x)
-                        loss = loss_fn(y_out, y)
-                        loss.backward()
-                        optim.step()
-                        scheduler.step()
-                    if epoch % epochs == epochs-1:
-                        loss_list.append(loss.item())
-                        accuracies_list.append(get_accuracy(model,test_dataloaders[client_id]))
-                loc_accuracies[client_id] = accuracies_list
-                loc_loss_dict[client_id] = loss_list
-            accuracies_dict = {}
-            for round in range(rounds):
-                accuracies_dict[round] = []
-                for client_id in range(nb_clients):
-                    accuracies_dict[round].append(loc_accuracies[client_id][round])
-            print(f"Mean accuracy over clients: {np.mean([loc_accuracies[client_id][-1] for client_id in range(nb_clients)])}")
-            # save in a npy file the accuracies and the losses
-            np.save("./outputs/" + datetime_string + "/accuracies_" + "local_" + str(counter_merge // nb_exp) + ".npy", accuracies_dict)
-            np.save("./outputs/" + datetime_string + "/loss_" + "local_" + str(counter_merge // nb_exp) + ".npy", loc_loss_dict)
-
-
-            print("Apprentissage totalototal...")
-            # we do the learning with only one client over the union of all datasets
-            loc_accuracies = {}
-            loc_loss_dict = {}
-            accuracies_dict = {}
-            accuracies_list = []
-            loss_list = []
-            model.load_state_dict(W)
-            model.train()
-            optim = torch.optim.SGD(model.parameters(), lr=args.lr)
-            scheduler = StepLR(optim, step_size=epochs, gamma=0.99)
-            for epoch in range(epochs*rounds):
-                for (x, y) in union_train_dataloader:
-                    model.train()
-                    optim.zero_grad()
-                    y_out = model(x)
-                    loss = loss_fn(y_out, y)
-                    loss.backward()
-                    optim.step()
-                    scheduler.step()
-                if epoch % epochs == epochs-1:
-                    loss_list.append(loss.item())
-                    accuracies_list.append(get_accuracy(model,union_test_dataloader))
-            # save in a npy file the accuracies and the losses
-            np.save("./outputs/" + datetime_string + "/accuracies_Total_" + str(counter_merge // nb_exp) + ".npy", accuracies_list)
-            np.save("./outputs/" + datetime_string + "/loss_Total_" + str(counter_merge // nb_exp) + ".npy", loc_loss_dict)
+        
 
         counter_merge += 1
         accuracies_dict = {}
@@ -440,8 +381,8 @@ if __name__ == '__main__':
                 plt.fill_between(np.arange(len(test_accs[merger_name]/count[merger_name])), test_accs[merger_name]/count[merger_name] - test_accs_conf_int[merger_name], test_accs[merger_name]/count[merger_name] + test_accs_conf_int[merger_name], alpha=0.1)
 
         plt.legend()
-        # title with the number of curves of FedAvg
-        plt.title("FedAvg: " + str(count["FedAvg"]))
+        # title with the number of curves of the last merger_name
+        plt.title(f"Test accuracies for {merger_name_copy} with {count[merger_name_copy]} curves")
         plt.savefig("./outputs/plots/" + datetime_string + "test_accs.png")
         plt.close()
         # plot all the curves in alpha_dict_gen with matplotlib
