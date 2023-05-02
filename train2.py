@@ -268,8 +268,11 @@ if __name__ == '__main__':
             # define test and train dataloaders for each client
             train_dataloaders = [torch.utils.data.DataLoader(datasets[client_id]['train'], batch_size=batchsize, shuffle=True, num_workers=0) for client_id in range(nb_clients)]
             test_dataloaders = [torch.utils.data.DataLoader(datasets[client_id]['test'], batch_size=1, shuffle=False, num_workers=0) for client_id in range(nb_clients)]
-        
-
+            # define the train and test dataloaders of the reunion of the datasets of all clients
+            union_train_dataset = torch.utils.data.ConcatDataset(datasets[client_id]['train'] for client_id in range(nb_clients))
+            union_train_dataloader = torch.utils.data.DataLoader(union_train_dataset, batch_size=batchsize, shuffle=True, num_workers=0)
+            union_test_dataset = torch.utils.data.ConcatDataset(datasets[client_id]['test'] for client_id in range(nb_clients))
+            union_test_dataloader = torch.utils.data.DataLoader(union_test_dataset, batch_size=1, shuffle=False, num_workers=0)
 
         if counter_merge % nb_exp == 0 and local_true:
             print("Apprentissage localolocal...")
@@ -296,13 +299,46 @@ if __name__ == '__main__':
                         accuracies_list.append(get_accuracy(model,test_dataloaders[client_id]))
                 loc_accuracies[client_id] = accuracies_list
                 loc_loss_dict[client_id] = loss_list
+            accuracies_dict = {}
+            for round in range(rounds):
+                accuracies_dict[round] = []
+                for client_id in range(nb_clients):
+                    accuracies_dict[round].append(loc_accuracies[client_id][round])
             print(f"Mean accuracy over clients: {np.mean([loc_accuracies[client_id][-1] for client_id in range(nb_clients)])}")
             # save in a npy file the accuracies and the losses
-            np.save("./outputs/" + datetime_string + "/loc_accuracies_" + "local_" + str(counter_merge // nb_exp) + ".npy", loc_accuracies)
-            np.save("./outputs/" + datetime_string + "/loc_loss_dict_" + "local_" + str(counter_merge // nb_exp) + ".npy", loc_loss_dict)
+            np.save("./outputs/" + datetime_string + "/accuracies_" + "local_" + str(counter_merge // nb_exp) + ".npy", accuracies_dict)
+            np.save("./outputs/" + datetime_string + "/loss_" + "local_" + str(counter_merge // nb_exp) + ".npy", loc_loss_dict)
+
+
+            print("Apprentissage totalototal...")
+            # we do the learning with only one client over the union of all datasets
+            loc_accuracies = {}
+            loc_loss_dict = {}
+            accuracies_dict = {}
+            accuracies_list = []
+            loss_list = []
+            model.load_state_dict(W)
+            model.train()
+            optim = torch.optim.SGD(model.parameters(), lr=args.lr)
+            scheduler = StepLR(optim, step_size=epochs, gamma=0.99)
+            for epoch in range(epochs*rounds):
+                for (x, y) in union_train_dataloader:
+                    model.train()
+                    optim.zero_grad()
+                    y_out = model(x)
+                    loss = loss_fn(y_out, y)
+                    loss.backward()
+                    optim.step()
+                    scheduler.step()
+                if epoch % epochs == epochs-1:
+                    loss_list.append(loss.item())
+                    accuracies_list.append(get_accuracy(model,union_test_dataloader))
+            # save in a npy file the accuracies and the losses
+            np.save("./outputs/" + datetime_string + "/accuracies_Total_" + str(counter_merge // nb_exp) + ".npy", accuracies_list)
+            np.save("./outputs/" + datetime_string + "/loss_Total_" + str(counter_merge // nb_exp) + ".npy", loc_loss_dict)
 
         counter_merge += 1
-        
+        accuracies_dict = {}
         for round in tqdm(range(rounds)):
             accuracies_list = []
             train_accuracies_list = []

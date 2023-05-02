@@ -3,17 +3,18 @@ import torch
 
 from src.convnet import ConvNet
 from src.tf_cifar import TFCifar
+from src.tf_cifar import TFCifar
 from src.datasets import MNIST, FMNIST, CIFAR10
 from src.accuracy import get_accuracy
 
 if __name__ == "__main__":
     device = 'cuda'
-    epochs = 1
+    epochs = 10
     batchsize = 64
 
-    data_train = MNIST(True, device)
-    data_test = MNIST(False, device)
-    model = ConvNet()
+    data_train = CIFAR10(True, device)
+    data_test = CIFAR10(False, device)
+    model = TFCifar()
     model.to(device)
 
     accs = []
@@ -21,7 +22,7 @@ if __name__ == "__main__":
     loss_fn = torch.nn.CrossEntropyLoss(reduction='sum')
     testloader = torch.utils.data.DataLoader(data_test, batch_size=1000, shuffle=True, num_workers=0)
     dataloader = torch.utils.data.DataLoader(data_train, batch_size=batchsize, shuffle=True, num_workers=0)
-    optim = torch.optim.SGD(model.parameters(), lr=5e-6)
+    optim = torch.optim.SGD(model.parameters(), lr=1e-2)
 
     for epoch in range(epochs):
         model.train()

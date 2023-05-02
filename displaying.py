@@ -14,6 +14,59 @@ def accuracy_display(directorypath):
         if filename.startswith("accuracies_"):
             # get the string between "accuracies_" and the next "_"
             merger_name = filename.split("_")[1]
+            nb = (filename.split("_")[2]).split(".")[0]
+            # if it is FedSoftMax500 pass
+            if merger_name == "FedSoftMax500":
+                continue
+            # if merger_name == "FedMaxk" or merger_name == "FedMix":
+            # load the dictionary
+            new_dict = np.load(os.path.join(directorypath, filename), allow_pickle=True).item()
+            if merger_name not in merger_names:
+                merger_names[merger_name] = 1
+                merger_accs[merger_name] = [np.array([np.mean(new_dict[round]) for round in range(len(new_dict))])]
+            else:
+                merger_names[merger_name] += 1
+                merger_accs[merger_name].append([np.mean(new_dict[round]) for round in range(len(new_dict))])
+    # Divide the values of merger_accs by the corresponding values of merger_names
+    merger_accs_means = {}
+    merger_accs_stds = {}
+    for merger_name in merger_names:
+        merger_accs_means[merger_name] = np.mean(merger_accs[merger_name], axis=0)
+        # but take std of the accs minus the ones of corresponding fedavg
+        try:
+            copy_of_fedavg = np.array(merger_accs["FedAvg"])[:len(merger_accs[merger_name])]
+            merger_accs_stds[merger_name] = np.std((merger_accs[merger_name]- copy_of_fedavg), axis=0)
+        except:
+            merger_accs_stds[merger_name] = np.std(merger_accs[merger_name], axis=0)
+        
+    if "FedAvg" not in merger_names:
+        merger_names["FedAvg"] = 0
+    # plot merger_accs[merger_name] for each merger_name
+    for merger_name in merger_names:
+        if merger_names[merger_name] == 0:
+            continue
+        plt.plot(merger_accs_means[merger_name], label=merger_name)
+        # plot 95% confidence interval (don't forget square root of number of curves)
+        plt.fill_between(range(len(merger_accs_means[merger_name])), merger_accs_means[merger_name] - 1.96 * merger_accs_stds[merger_name] / np.sqrt(merger_names[merger_name]), merger_accs_means[merger_name] + 1.96 * merger_accs_stds[merger_name] / np.sqrt(merger_names[merger_name]), alpha=0.1)
+    plt.legend()
+    plt.title("Number of curves: " + str(merger_names["FedAvg"]))
+    plt.show()
+    # save as png in the folder "bash"
+    plt.savefig("./bash/accuracies.png")
+    plt.close()
+
+def accuracy_display_2(directorypath):
+    merger_names = {}
+    merger_accs = {}
+    # Load the dictionaries in all files of directorypath with name beginning by "accuracies_"
+    for filename in os.listdir(directorypath):
+        if filename.startswith("accuracies_"):
+            # get the string between "accuracies_" and the next "_"
+            merger_name = filename.split("_")[1]
+            # if it is FedSoftMax500 pass
+            if merger_name == "FedSoftMax500":
+                continue
+            # if merger_name == "FedMaxk" or merger_name == "FedMix":
             # load the dictionary
             new_dict = np.load(os.path.join(directorypath, filename), allow_pickle=True).item()
             if merger_name not in merger_names:
@@ -29,9 +82,13 @@ def accuracy_display(directorypath):
     # plot merger_accs[merger_name] for each merger_name
     for merger_name in merger_names:
         plt.plot(merger_accs[merger_name], label=merger_name)
+        print(merger_name, merger_names[merger_name])
     plt.legend()
-    # plt.title("Number of curves: " + str(merger_names["FedAvg"]))
+    plt.title("Number of curves: " + str(merger_names["FedAvg"]))
     plt.show()
+    # save as png in the folder "bash"
+    plt.savefig("./bash/accuracies.png")
+    plt.close()
 
 def loss_display(directorypath):
     merger_names = {}
@@ -58,6 +115,9 @@ def loss_display(directorypath):
         plt.plot(merger_losses[merger_name], label=merger_name)
     plt.legend()
     plt.show()
+    # save as png in the folder "bash"
+    plt.savefig("./bash/losses.png")
+    plt.close()
 
 def loss_train_display(directorypath):
     merger_names = {}
@@ -101,6 +161,9 @@ def loss_train_display(directorypath):
     plt.legend()
     # plt.title("Number of curves: " + str(merger_names["FedAvg"]))
     plt.show()
+    # save as png in the folder "bash"
+    plt.savefig("./bash/train_losses.png")
+    plt.close()
 
 def loss_train_matrix_display(directorypath):
     merger_names = {}
@@ -121,7 +184,7 @@ def loss_train_matrix_display(directorypath):
     # plot merger_accs[merger_name] for each merger_name
     for merger_name in merger_names:
         # plot the matrix of alphas
-        print(merger_name)
+        # print(merger_name)
         plt.imshow(merger_losses[merger_name], label=merger_name)
         plt.legend()
         plt.show()
@@ -145,7 +208,7 @@ def loss_matrix_display(directorypath):
     # plot merger_accs[merger_name] for each merger_name
     for merger_name in merger_names:
         # plot the matrix of alphas
-        print(merger_name)
+        # print(merger_name)
         plt.imshow(merger_losses[merger_name], label=merger_name)
         plt.legend()
         plt.show()
@@ -153,8 +216,8 @@ def loss_matrix_display(directorypath):
 def print_info(directorypath):
     # load the dictionary in the file of name "info"
     info = np.load(os.path.join(directorypath, "info.npy"), allow_pickle=True).item()
-    for key in info:
-        print(key, ":", info[key])
+    # for key in info:
+    #     print(key, ":", info[key])
     return info["nb_clients"]
 
 def alpha_display(directorypath, pi):
@@ -211,6 +274,8 @@ def alpha_display(directorypath, pi):
         plt.plot(norm_matrix_avg, label=merger_name)
     plt.legend()
     plt.show()
+    # save as png
+    plt.savefig("./bash/alpha_display.png")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -218,7 +283,7 @@ if __name__ == "__main__":
     # look for the directory with the latest datetime format
     latest_string = "0000-00-00_00-00-00"
     for filename in os.listdir("outputs"):
-        if filename > latest_string:
+        if filename[0:2] == "20" and filename > latest_string:
             latest_string = filename
     parser.add_argument("--dir", type=str, default=os.path.join("outputs", latest_string), help="Directory path to the results")
     parser.add_argument("--accs", type=int, default=0, help="Display the accuracies")
