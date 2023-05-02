@@ -5,10 +5,14 @@ import numpy as np
 import time
 import os
 import torch
+# use tensorboard
+from torch.utils.tensorboard import SummaryWriter
 # import StepLR
 from torch.optim.lr_scheduler import StepLR
 
 from tqdm import tqdm
+
+import matplotlib.pyplot as plt
 
 # metrics
 from src.accuracy import get_accuracy
@@ -44,22 +48,25 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO,
     format='| %(levelname)s | %(message)s')
 
+    # initialize tensorboard
+    # writer = SummaryWriter()
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--device", type=str, default="cuda", help="name of device")
     parser.add_argument("--dataset", type=str, default="MNIST", choices=["MNIST", "FMNIST", "CIFAR10"], help="name of dataset")
-    parser.add_argument("--clients", type=int, default=100, help="number of clients")
+    parser.add_argument("--clients", type=int, default=50, help="number of clients")
     parser.add_argument("--batch", type=int, default=64, help="batch size")
-    parser.add_argument("--rounds", type=int, default=100, help="nb of rounds")
+    parser.add_argument("--rounds", type=int, default=20, help="nb of rounds")
     parser.add_argument("--nbexp", type=int, default=1, help="nb of differente methods tested")
     parser.add_argument("--sizeclient", type=int, default=200, help="nb of samples per client")
     parser.add_argument("--epochs", type=int, default=1, help="nb of local epochs")
     parser.add_argument("--balanced", type=str, default='iid', help="iid for balanced clients")
     parser.add_argument("--shardsize", type=int, default=30, help="shardsize argument for unbalanced datasets")
     parser.add_argument("--lrmethod", type=str, default="decay", choices=["const", "decay"], help="learning rate method")
-    parser.add_argument("--lr", type=float, default=1e-3, help="learning rate argument")
+    parser.add_argument("--lr", type=float, default=1e-4, help="learning rate argument")
     parser.add_argument("--experiment", type=str, help="names of experiment to run")
     parser.add_argument("--output", type=str, help="output file")
-    parser.add_argument("--max", type=float, default=0.81, help="maximum accuracy")
+    parser.add_argument("--max", type=float, default=1.1, help="maximum accuracy")
     parser.add_argument("--topk", type=float, default=0.1, help="maximum accuracy")
     parser.add_argument("--softmin", type=float, default=0.1, help="alpha parameter for hybrid")
     parser.add_argument("--local_true", type=bool, default=False, help="whether or not to do local training")
@@ -103,9 +110,9 @@ if __name__ == '__main__':
 
     size_client = args.sizeclient
     size_list = [size_client]*nb_clients
-    numbers_list = [[1/3, 1/3, 1/3, 0., 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 1/3, 1/3, 1/3, 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 0., 1/3, 1/3, 1/3] for _ in range(nb_clients//5)]
+    # numbers_list = [[1/3, 1/3, 1/3, 0., 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 1/3, 1/3, 1/3, 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 1/3, 1/3, 1/3, 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 0., 1/3, 1/3, 1/3] for _ in range(nb_clients//5)]
 
-    # numbers_list = [[1/2, 1/2, 0., 0., 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 1/2, 1/2, 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 1/2, 1/2, 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 1/2, 1/2, 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 0., 0., 1/2, 1/2] for _ in range(nb_clients//5)]
+    numbers_list = [[1/2, 1/2, 0., 0., 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 1/2, 1/2, 0., 0., 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 1/2, 1/2, 0., 0., 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 1/2, 1/2, 0., 0.] for _ in range(nb_clients//5)] + [[0., 0., 0., 0., 0., 0., 0., 0., 1/2, 1/2] for _ in range(nb_clients//5)]
 
     logging.info(f"Number of rounds = {args.rounds}")
     rounds = args.rounds
@@ -136,7 +143,8 @@ if __name__ == '__main__':
         mergers = [("FedAvg", Merger_FedAvg()), ("FedSoftmin", Merger_FedTopK(+0.2)), ("FedSoftmax", Merger_Hybrid([Merger_FedAvg(), Merger_FedTopK(+0.2)],
                                                 [0 if (r < 15) else 1 for r in range(rounds)]))]*10
     elif args.experiment == "avg":
-        mergers = [("FedAvg", Merger_FedAvg())]*1
+        mergers = [("FedAvg", Merger_FedAvg())]*100
+        nb_exp = 1
     elif args.experiment == "exp1":
         mergers = [("FedAvg", Merger_FedAvg()),
                    ("FedSoftmax", Merger_FedSoft(+20.0)),
@@ -171,18 +179,19 @@ if __name__ == '__main__':
                    ("FedSoftMax", Merger_FedSoft(+20.0))]*100
     elif args.experiment == "exppanel":
         mergers = [("FedAvg", Merger_FedAvg()),
+                   ("FedMink02", Merger_FedTopK(+0.02)),
+                   ("FedMink2", Merger_FedTopK(+0.2)),
                    ("FedSoftMax20", Merger_FedSoft(+20.0)),
                    ("FedSoftMax5", Merger_FedSoft(+5.0)),
                    ("FedSoftMax10", Merger_FedSoft(+10.0)),
                    ("FedSoftMax15", Merger_FedSoft(+15.0)),
-                   ("FedSoftMax30", Merger_FedSoft(+30.0))]*100
+                   ("FedSoftMax30", Merger_FedSoft(+30.0))]*1
     elif args.experiment == "expnewpanel":
         mergers = [("FedAvg", Merger_FedAvg()),
-                   ("FedSoftMax20", Merger_FedSoft(+20.0)),
-                   ("FedSoftMax40", Merger_FedSoft(+40.0)),
-                   ("FedSoftMax80", Merger_FedSoft(+80.0)),
-                   ("FedSoftMax200", Merger_FedSoft(+200.0)),
-                   ("FedSoftMax500", Merger_FedSoft(+500.0))]*100
+                    ("FedProp", Merger_FedSoft(+20., proportional=True)),
+                   ("FedMaxk", Merger_FedTopK(1/nb_clients)),
+                   ("FedSoftMax7", Merger_FedSoft(+7.0))]*1
+        nb_exp = 4
     elif args.experiment == "exp6":
         mergers = [("FedAvg", Merger_FedAvg()),
                    ("FedWCostAvg", Merger_FedWCostAvg(0.5)),
@@ -243,11 +252,21 @@ if __name__ == '__main__':
     # save the info dictionary in a npy file
     np.save("./outputs/" + datetime_string + "/info.npy", info)
 
+    test_accs = {}
+    test_accs_history = {}
+    test_accs_conf_int = {}
+    count = {}
+    alpha_dict_gen = {}
+
     for merger_name, merger in mergers:
+        # create a new summary writer for each merger
+        writer = SummaryWriter("./runs/" + datetime_string + "/" + merger_name)
         accuracies_dict = {}
         train_accuracies_dict = {}
         loss_dict = {}
         alpha_dict = {}
+        alpha_gen_list = []
+        mean_accuracies_dict = []
         print(f"[{merger_name}] Begin...")
         merger.reset()
         if counter_merge % nb_exp == 0:
@@ -339,21 +358,70 @@ if __name__ == '__main__':
             accuracies_dict[round] = accuracies_list
             train_accuracies_dict[round] = train_accuracies_list
             loss_dict[round] = loss_list
+            mean_accuracies_dict.append(np.mean(accuracies_list))
+
+            
 
             W, alpha = merger(outputs, accuracies_dict[round])
             model.load_state_dict(W)
             alpha_dict[round] = alpha
+
+            alpha_gen_list.append(np.linalg.norm(alpha-np.array([1/nb_clients for _ in range(nb_clients)])))
             
             step += 1
             elapsed_time = time.perf_counter() - t1
             remaining_time = (time.perf_counter() - t0) * (steps-step)/step
+
+            writer.close()
             
 
             if accuracies_dict[round][-1] > args.max:
                 break
+        # plot alpha_dict with a curve for each client
+        for client_id in range(nb_clients):
+            plt.plot(alpha_dict[client_id])
+        plt.legend()
+        plt.savefig(f"./outputs/{datetime_string}/alpha_{merger_name}.png")
+        plt.close()
+        # if merger_name in test_accs
+        mean_accuracies_dict = np.array(mean_accuracies_dict)
+        if merger_name in test_accs.keys():
+            test_accs[merger_name] += mean_accuracies_dict
+            alpha_dict_gen[merger_name] = alpha_gen_list
+            count[merger_name] += 1
+            test_accs_history[merger_name].append(list(mean_accuracies_dict))
+            # compute the 95% confidence interval
 
+            mean = np.mean(np.array(test_accs_history[merger_name]), axis=0)
+            std = np.std(np.array(test_accs_history[merger_name]), axis=0)
+            conf_int = 1.96 * std / np.sqrt(count[merger_name])
+            # add to dictionary
+            test_accs_conf_int[merger_name] = conf_int
+        else:
+            test_accs[merger_name] = mean_accuracies_dict
+            alpha_dict_gen[merger_name] = alpha_gen_list
+            test_accs_history[merger_name] = [list(mean_accuracies_dict)]
+            count[merger_name] = 1
+        # plot all the curves in test_accs with matplotlib
+        for merger_name in test_accs:
+            plt.plot(test_accs[merger_name]/count[merger_name], label=merger_name)
+            if merger_name in test_accs_conf_int:
+                plt.fill_between(np.arange(len(test_accs[merger_name]/count[merger_name])), test_accs[merger_name]/count[merger_name] - test_accs_conf_int[merger_name], test_accs[merger_name]/count[merger_name] + test_accs_conf_int[merger_name], alpha=0.1)
+
+        plt.legend()
+        # title with the number of curves of FedAvg
+        plt.title("FedAvg: " + str(count["FedAvg"]))
+        plt.savefig("./outputs/plots/" + datetime_string + "test_accs.png")
+        plt.close()
+        # plot all the curves in alpha_dict_gen with matplotlib
+        for merger_name in alpha_dict_gen:
+            plt.plot(alpha_dict_gen[merger_name], label=merger_name)
+        plt.legend()
+        plt.savefig("./outputs/plots/" + datetime_string + "alpha_gen.png")
+        plt.close()
         # save in a npy file the accuracies and the losses
         np.save("./outputs/" + datetime_string + "/accuracies_" + merger_name + "_" + str(counter_merge // nb_exp) + ".npy", accuracies_dict)
         np.save("./outputs/" + datetime_string + "/train_accuracies_" + merger_name + "_" + str(counter_merge // nb_exp) + ".npy", train_accuracies_dict)
         np.save("./outputs/" + datetime_string + "/loss_dict_" + merger_name + "_" + str(counter_merge // nb_exp) + ".npy", loss_dict)
         np.save("./outputs/" + datetime_string + "/alpha_dict_" + merger_name + "_" + str(counter_merge // nb_exp) + ".npy", alpha_dict)
+
